@@ -1,3 +1,29 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+
+// إعدادات Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCBTPlQVGgqL1MmDuZRSJMlS244AtAzZ6E",
+  authDomain: "web-zone-c95aa.firebaseapp.com",
+  projectId: "web-zone-c95aa",
+  storageBucket: "web-zone-c95aa.firebasestorage.app",
+  messagingSenderId: "776469157795",
+  appId: "1:776469157795:web:d69518695895cff22e2c16",
+  measurementId: "G-9NLEWJYZ6J"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// ✅ التحقق من تسجيل الدخول
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    window.location.href = "https://abyss-api-ecru.vercel.app/";
+  }
+});
+
+// ================= الكود بتاعك =================
+
 // العناصر الرئيسية
 const startBtn = document.getElementById('startProjectBtn');
 const modal = document.getElementById('projectForm');
@@ -11,23 +37,18 @@ const btnRight = document.querySelector('.slider-btn-right');
 
 // ======== فتح وغلق الموديل ========
 if (startBtn && modal && closeBtn && sendBtn) {
-
-  // فتح الموديل
   startBtn.addEventListener('click', () => {
     modal.style.display = 'flex';
   });
 
-  // غلق الموديل عند الضغط على الزر
   closeBtn.addEventListener('click', () => {
     modal.style.display = 'none';
   });
 
-  // غلق عند الضغط خارج المحتوى
   window.addEventListener('click', (e) => {
     if (e.target === modal) modal.style.display = 'none';
   });
 
-  // إرسال WhatsApp
   sendBtn.addEventListener('click', () => {
     const name = document.getElementById('nameInput').value.trim();
     const email = document.getElementById('emailInput').value.trim();
@@ -43,7 +64,6 @@ if (startBtn && modal && closeBtn && sendBtn) {
     const win = window.open(waLink, '_blank');
     if (!win) alert('تعذر فتح WhatsApp. تحقق من إعدادات منع النوافذ المنبثقة.');
 
-    // مسح الحقول
     document.getElementById('nameInput').value = '';
     document.getElementById('emailInput').value = '';
     document.getElementById('requestInput').value = '';
@@ -59,17 +79,13 @@ function showProject(index) {
     if (i === index) p.classList.add('active');
   });
 }
-
-// اظهار المشروع الأول
 if (projects.length > 0) showProject(currentIndex);
 
-// التالي
 if (btnRight) btnRight.addEventListener('click', () => {
   currentIndex = (currentIndex + 1) % projects.length;
   showProject(currentIndex);
 });
 
-// السابق
 if (btnLeft) btnLeft.addEventListener('click', () => {
   currentIndex = (currentIndex - 1 + projects.length) % projects.length;
   showProject(currentIndex);
@@ -83,6 +99,7 @@ if (clientSlider) {
     clientSlider.scrollLeft += e.deltaY;
   });
 }
+
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('toggleBtn');
 const links = document.querySelectorAll('#sidebar a');
@@ -92,7 +109,6 @@ toggleBtn.addEventListener('click', () => {
   toggleBtn.classList.toggle('active');
 });
 
-// يغلق القائمة عند اختيار أي قسم
 links.forEach(link => {
   link.addEventListener('click', () => {
     sidebar.classList.remove('active');
