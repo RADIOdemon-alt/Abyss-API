@@ -2,7 +2,7 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import authRoutes from './routes/auth.js';
-import tools_tr from './routes/tools_tr.js'; // تأكد من اسم الملف
+import tools_tr from './routes/tools-tr.js'; // تأكد من اسم الملف
 
 const app = express();
 const port = process.env.PORT || 3000;
