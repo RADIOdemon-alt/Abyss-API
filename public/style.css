@@ -1,167 +1,235 @@
-/* استيراد خط Cairo */
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-
 body {
-    background:#0a0a0a;
-    font-family:'Cairo', sans-serif;
-    color:#fff;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    min-height:100vh;
-    margin:0;
-    padding:0;
-    direction: rtl;
-    overflow:auto;
+  margin: 0;
+  font-family: "Cairo", sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
 }
 
-/* حاوية الفورم في وسط الشاشة */
-.login-container {
-    width:100%;
-    max-width:400px;
-    padding:20px;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    position:relative;
+#bg-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  min-width: 100%;
+  min-height: 100%;
+  z-index: -1;
+  object-fit: cover;
+  object-position: center;
 }
 
-/* الكارد */
-.card {
-    background:#111;
-    padding:30px;
-    border-radius:15px;
-    box-shadow:
-        0 0 10px rgba(255,0,85,0.3),
-        0 0 20px rgba(255,0,85,0.2);
-    width:100%;
-    max-width:400px;
-    opacity:0;
-    pointer-events:none;
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%, 20px) scale(0.95);
-    transition: all 0.5s ease;
-    overflow-y:auto;
-    max-height:85vh;
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
 }
 
-.card.active {
-    opacity:1;
-    transform:translate(-50%, -50%) scale(1);
-    pointer-events:auto;
+.form-box {
+  background: rgba(0, 0, 0, 0.8);
+  position: relative;
+  padding: 25px;
+  border-radius: 20px;
+  box-shadow: 0 0 25px rgba(0, 200, 255, 0.7);
+  text-align: center;
+  width: 280px;
+  max-width: 90%;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 1s ease, electricGlow 3s infinite;
+  opacity: 1; /* ظاهر دائمًا */
+  visibility: visible; /* ظاهر دائمًا */
+  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-/* العناوين */
-h1,h2 {
-    text-align:center;
-    color:#ff0055;
-    margin:10px 0;
-    font-size:1.5em;
+.form-box.hide {
+  opacity: 0; /* تختفي تدريجيًا */
+  visibility: hidden;
 }
 
-/* الفورم */
-form {
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    margin-bottom:15px;
+.card-avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 2px solid #00e0ff;
+  box-shadow: 0 0 10px #00e0ff, 0 0 20px #00e0ff inset;
+  overflow: hidden;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  top: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  animation: electricGlow 3s infinite;
 }
 
-input,button {
-    padding:12px;
-    border-radius:8px;
-    border:none;
-    outline:none;
-    font-family:'Cairo', sans-serif;
-    font-size:1em;
-    text-align:right;
+.card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
-input {
-    background:#222;
-    color:#fff;
-    box-shadow: inset 0 0 5px rgba(255,0,85,0.2);
+.form-box h2 {
+  margin-bottom: 15px;
+  font-weight: 700;
+  font-size: 18px;
+  color: #00e0ff;
+  text-shadow: 0 0 8px #00e0ff;
 }
 
-button {
-    background:#ff0055;
-    color:#fff;
-    cursor:pointer;
-    font-weight:bold;
-    transition: all 0.3s ease;
+.input-group {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  transition: 0.3s;
 }
 
-button:hover {
-    background:#5500ff;
+.input-group i {
+  color: #00e0ff;
+  margin-left: 8px;
+  transition: 0.3s;
+  text-shadow: 0 0 8px rgba(0, 224, 255, 0.6);
 }
 
-/* رابط التبديل */
-.switch {
-    color:#00f;
-    text-decoration:underline;
-    text-align:center;
-    cursor:pointer;
-    margin-top:10px;
-    font-size:0.95em;
-    display:block;
+.input-group input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: rgba(0,0,0,0.2);
+  color: #fff;
+  font-size: 13px;
+  padding: 6px;
+  border-radius: 5px;
 }
 
-/* Scrollbar لطيف للكارد */
-.card::-webkit-scrollbar {
-    width:6px;
-}
-.card::-webkit-scrollbar-track {
-    background:transparent;
-}
-.card::-webkit-scrollbar-thumb {
-    background:#ff0055;
-    border-radius:3px;
+.input-group input::placeholder {
+  color: #ccc;
 }
 
-/* مودال الشروط */
-.modal {
-    display:none;
-    position:fixed;
-    top:0; left:0;
-    width:100%; height:100%;
-    background:rgba(0,0,0,0.9);
-    justify-content:center;
-    align-items:center;
-    z-index:999;
+.input-group:focus-within {
+  box-shadow: 0 0 12px #00e0ff;
+  background: rgba(0, 200, 255, 0.15);
 }
 
-.modal-content {
-    background:#111;
-    color:#fff;
-    padding:30px;
-    border-radius:10px;
-    max-width:500px;
-    max-height:80%;
-    overflow-y:auto;
+.input-group:focus-within i {
+  color: #fff;
+  animation: pulseIcon 1s infinite;
+  text-shadow: 0 0 12px #00e0ff, 0 0 24px #00e0ff;
 }
 
-.close {
-    float:right;
-    cursor:pointer;
-    color:#ff0055;
-    font-weight:bold;
+.form-box button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #00e0ff, #0077ff);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.3s;
 }
 
-/* استجابة للشاشات الصغيرة */
-@media (max-width:480px) {
-    .login-container {
-        padding:10px;
-    }
-    .card {
-        padding:20px;
-    }
-    h1,h2 {
-        font-size:1.3em;
-    }
-    input,button {
-        padding:10px;
-        font-size:0.95em;
-    }
+.form-box button:hover {
+  background: linear-gradient(90deg, #0077ff, #00e0ff);
+  box-shadow: 0 0 15px #00e0ff;
+}
+
+.hidden { display: none; }
+
+.message-box, .welcome-box {
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-weight: bold;
+  width: 280px;
+  max-width: 90%;
+  text-align: center;
+  position: fixed; /* منتصف الشاشة */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  z-index: 1000;
+  background: rgba(0,0,0,0.85);
+  animation: fadeIn 0.3s ease;
+}
+
+.message-box.error { 
+  color: #ff5555; 
+  box-shadow: 0 0 15px #ff5555; 
+}
+
+.welcome-box { 
+  color: #00ff99; 
+  box-shadow: 0 0 15px #00ff99; 
+}
+
+/* Custom Select Discord Style */
+.custom-select {
+  position: relative;
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  border-radius: 5px;
+  cursor: pointer;
+  color: #fff;
+  user-select: none;
+}
+
+.custom-select .selected {
+  padding: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.custom-select .options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: rgba(10,10,10,0.95);
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 0 0 5px 5px;
+  z-index: 5;
+  box-shadow: 0 0 10px #00e0ff;
+}
+
+.custom-select .options li {
+  padding: 8px 10px;
+  list-style: none;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-select .options li:hover {
+  background: rgba(0, 200, 255, 0.2);
+  color: #00e0ff;
+  border-radius: 5px;
+}
+
+/* Animations */
+@keyframes fadeIn { 
+  from { opacity:0; transform:scale(0.9);}
+  to { opacity:1; transform:scale(1);}
+}
+@keyframes pulseIcon {
+  0%{transform:scale(1);opacity:1;}
+  50%{transform:scale(1.2);opacity:0.8;}
+  100%{transform:scale(1);opacity:1;}
+}
+@keyframes electricGlow {
+  0%,100%{box-shadow:0 0 25px rgba(0,200,255,0.7);}
+  50%{box-shadow:0 0 45px rgba(0,200,255,1),0 0 70px rgba(0,200,255,0.6);}
 }
