@@ -9,23 +9,23 @@ body {
     justify-content:center;
     align-items:center;
     min-height:100vh;
-    overflow:auto;
     margin:0;
     padding:0;
     direction: rtl; /* كل النصوص من اليمين لليسار */
 }
 
+/* حاوية الفورم في وسط الشاشة */
 .login-container {
-    position:relative;
-    width:320px; /* حجم الكارد طبيعي */
-    max-width:90vw;
-    max-height:90vh;
+    width:100%;
+    max-width:400px;
+    padding:20px;
     display:flex;
     justify-content:center;
     align-items:center;
+    position:relative;
 }
 
-/* الكاردات */
+/* الكارد */
 .card {
     background:#111;
     padding:30px;
@@ -33,16 +33,17 @@ body {
     box-shadow:
         0 0 10px rgba(255,0,85,0.3),
         0 0 20px rgba(255,0,85,0.2);
-    position:absolute;
     width:100%;
+    opacity:0;
+    pointer-events:none;
+    transform:translateY(20px) scale(0.95);
+    transition: all 0.5s ease;
+    overflow-y:auto;
+    max-height:85vh;
+    position:absolute;
     top:50%;
     left:50%;
     transform:translate(-50%, 20px) scale(0.95);
-    opacity:0;
-    pointer-events:none;
-    transition: all 0.5s ease;
-    overflow-y:auto;
-    max-height:80vh;
 }
 
 .card.active {
@@ -51,6 +52,7 @@ body {
     pointer-events:auto;
 }
 
+/* عناوين */
 h1,h2 {
     text-align:center;
     color:#ff0055;
@@ -58,6 +60,7 @@ h1,h2 {
     font-size:1.5em;
 }
 
+/* الفورم */
 form {
     display:flex;
     flex-direction:column;
@@ -93,6 +96,7 @@ button:hover {
     background:#5500ff;
 }
 
+/* رابط التبديل */
 .switch {
     color:#00f;
     text-decoration:underline;
@@ -113,4 +117,21 @@ button:hover {
 .card::-webkit-scrollbar-thumb {
     background:#ff0055;
     border-radius:3px;
+}
+
+/* استجابة للشاشات الصغيرة */
+@media (max-width:480px) {
+    .login-container {
+        padding:10px;
+    }
+    .card {
+        padding:20px;
+    }
+    h1,h2 {
+        font-size:1.3em;
+    }
+    input,button {
+        padding:10px;
+        font-size:0.95em;
+    }
 }
