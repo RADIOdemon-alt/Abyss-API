@@ -1,7 +1,6 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import authRoutes from './routes/auth.js';
 import tools_tr from './routes/tools-tr.js';
 
 const app = express();
@@ -17,7 +16,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // مسارات API يجب أن تكون قبل الـ fallback
-app.use('/api/auth', authRoutes);
 app.use('/api/tr', tools_tr);
 
 // fallback لأي طلب غير API → صفحة index
