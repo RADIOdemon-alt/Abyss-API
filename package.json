@@ -1,0 +1,39 @@
+{
+  "name": "nodejs",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@types/node": "^18.0.6",
+    "express": "^4.19.2",
+    "canvas": "^2.9.0",
+    "jimp": "^0.16.1",
+    "cors": "^2.8.5",
+    "axios": "^1.7.2",
+    "file-type": "^19.4.0",
+    "form-data": "^4.0.0",
+    "formdata-node": "^6.0.3",
+    "image-size": "^1.1.1",
+    "node-fetch": "^3.3.2",
+    "google-translate-api-x": "*",
+    "simple-git": "^3.25.0",
+    "cheerio": "github:AikerDev/cheeiro",
+    "discord.js": "^12.5.3",
+    "puppeteer": "^23.6.0",
+    "cookie-parser": "1.4.7",
+    "puppeteer-cluster": "^0.23.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "chokidar": "^3.5.3",
+    "soundcloud-scraper": "^2.0.0",
+    "string-similarity": "^4.0.4",
+    "fuse.js": "^6.6.2",
+    "fast-levenshtein": "^2.0.6"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
