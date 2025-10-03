@@ -16,49 +16,56 @@
 </head>
 <body>
   
+<!-- زر القائمة -->
 <div id="toggleBtn"><i class="fas fa-bars"></i></div>
 
-<!-- Sidebar -->
+<!-- الشريط الجانبي -->
 <div id="sidebar">
   <!-- فيديو الخلفية -->
   <video autoplay muted loop>
     <source src="../../media/menu.mp4" type="video/mp4">
   </video>
 
-  <!-- محتوى فوق الفيديو -->
+  <!-- محتوى الشريط -->
   <div id="sidebar-content">
     <div>
       <div class="logo">
-        <img src="../../media/logo.png" alt="abyys Logo">
+        <img src="../../media/logo.png" alt="Abyss Logo">
       </div>
       <h2>Abyss-Api</h2>
       <ul class="menu">
-  <li><a href="#"><i class="fas fa-code"></i> المطور</a></li>
-  <li><a href="#"><i class="fas fa-bullhorn"></i> آخر الأخبار</a></li>
-  <li><a href="#"><i class="fas fa-plug"></i> APIs</a></li>
-  <li><a href="#"><i class="fas fa-id-card"></i> بروفايل</a></li>
-  <li><a href="#"><i class="fas fa-life-ring"></i> الدعم</a></li>
-</ul>
+        <li><a href="#"><i class="fas fa-code"></i> المطور</a></li>
+        <li><a href="#"><i class="fas fa-bullhorn"></i> آخر الأخبار</a></li>
+        <li><a href="#"><i class="fas fa-plug"></i> APIs</a></li>
+        <li><a href="#"><i class="fas fa-id-card"></i> بروفايل</a></li>
+        <li><a href="#"><i class="fas fa-life-ring"></i> الدعم</a></li>
+      </ul>
     </div>
 
+    <!-- تسجيل الخروج -->
     <ul class="logout">
-      <li><a href="https://abyss-api-ecru.vercel.app/"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</a></li>
+      <li>
+        <a href="https://abyss-api-ecru.vercel.app/">
+          <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+        </a>
+      </li>
     </ul>
   </div>
 </div>
-<!-- Background Video -->
+
+<!-- فيديو الخلفية الرئيسي -->
 <video id="bg-video" autoplay muted loop>
   <source src="../../media/home-bg.mp4" type="video/mp4">
   متصفحك لا يدعم عرض الفيديو
 </video>
-  <!-- Hero Section -->
-  <div class="hero">
-    <h1>مرحبًا بك في Abyss-api</h1>
-<p>نحن نقدم أحدث الـ API، أدوات مميزة، تحميل من جميع المواقع، تحديثات مستمرة وأمان متكامل.</p>
-     </div>
 
+<!-- قسم الترحيب -->
+<div class="hero">
+  <h1>مرحبًا بك في Abyss-api</h1>
+  <p>نحن نقدم أحدث الـ API، أدوات مميزة، تحميل من جميع المواقع، تحديثات مستمرة وأمان متكامل.</p>
+</div>
 
- <!-- Services Section -->
+<!-- قسم الخدمات -->
 <section class="services">
   <div class="service-card card">
     <i class="fa-solid fa-plug"></i>
@@ -97,15 +104,12 @@
   </div>
 </section>
 
-  
-  </section>
-  
-  <!-- Footer / Copyright Card -->
-  <div class="footer-card">
-    <h3>© Developed_by|RADIO</h3>
-  </div>
+<!-- الفوتر -->
+<div class="footer-card">
+  <h3>© Developed_by | RADIO</h3>
+</div>
 
-  <!-- JS -->
-  <script src="script.js"></script>
+<!-- JS -->
+ <script type="module" src="script.js"></script>
 </body>
 </html>
