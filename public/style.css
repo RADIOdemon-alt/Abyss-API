@@ -2,136 +2,141 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
 
 body {
-    background:#0a0a0a;
-    font-family:'Cairo', sans-serif;
-    color:#fff;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    min-height:100vh;
-    margin:0;
-    padding:0;
-    direction: rtl; /* كل النصوص من اليمين لليسار */
+    margin: 0;
+    padding: 0;
+    font-family: 'Cairo', sans-serif;
+    background: #0a0a0a;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    direction: rtl; /* النص من اليمين لليسار */
+    overflow: hidden;
 }
 
-/* حاوية الفورم في وسط الشاشة */
+/* حاوية الفورم والكارد */
 .login-container {
-    width:100%;
-    max-width:400px;
-    padding:20px;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    position:relative;
+    position: relative;
+    width: 100%;
+    max-width: 400px; /* نفس حجم الكارد */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
 }
 
 /* الكارد */
 .card {
-    background:#111;
-    padding:30px;
-    border-radius:15px;
-    box-shadow:
-        0 0 10px rgba(255,0,85,0.3),
-        0 0 20px rgba(255,0,85,0.2);
-    width:100%;
-    opacity:0;
-    pointer-events:none;
-    transform:translateY(20px) scale(0.95);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    max-height: 85vh;
+    padding: 30px;
+    border-radius: 20px;
+    background: rgba(17,17,17,0.95);
+    box-shadow: 0 0 25px rgba(255,0,85,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 20px) scale(0.95);
     transition: all 0.5s ease;
-    overflow-y:auto;
-    max-height:85vh;
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%, 20px) scale(0.95);
+    overflow-y: auto;
 }
 
+/* الكارد النشط */
 .card.active {
-    opacity:1;
-    transform:translate(-50%, -50%) scale(1);
-    pointer-events:auto;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
 }
 
-/* عناوين */
-h1,h2 {
-    text-align:center;
-    color:#ff0055;
-    margin:10px 0;
-    font-size:1.5em;
+/* العناوين */
+h1, h2 {
+    text-align: center;
+    color: #ff0055;
+    margin: 10px 0;
+    font-size: 1.5em;
 }
 
 /* الفورم */
 form {
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    margin-bottom:15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
-input,button {
-    padding:12px;
-    border-radius:8px;
-    border:none;
-    outline:none;
-    font-family:'Cairo', sans-serif;
-    font-size:1em;
-    text-align:right;
+input, button {
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+    font-family: 'Cairo', sans-serif;
+    font-size: 1em;
+    text-align: right;
 }
 
 input {
-    background:#222;
-    color:#fff;
+    background: #222;
+    color: #fff;
     box-shadow: inset 0 0 5px rgba(255,0,85,0.2);
 }
 
 button {
-    background:#ff0055;
-    color:#fff;
-    cursor:pointer;
-    font-weight:bold;
+    background: #ff0055;
+    color: #fff;
+    cursor: pointer;
+    font-weight: bold;
     transition: all 0.3s ease;
 }
 
 button:hover {
-    background:#5500ff;
+    background: #5500ff;
 }
 
 /* رابط التبديل */
 .switch {
-    color:#00f;
-    text-decoration:underline;
-    text-align:center;
-    cursor:pointer;
-    margin-top:10px;
-    font-size:0.95em;
-    display:block;
+    color: #00f;
+    text-decoration: underline;
+    text-align: center;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 0.95em;
+    display: block;
 }
 
 /* Scrollbar لطيف للكارد */
 .card::-webkit-scrollbar {
-    width:6px;
+    width: 6px;
 }
 .card::-webkit-scrollbar-track {
-    background:transparent;
+    background: transparent;
 }
 .card::-webkit-scrollbar-thumb {
-    background:#ff0055;
-    border-radius:3px;
+    background: #ff0055;
+    border-radius: 3px;
 }
 
 /* استجابة للشاشات الصغيرة */
-@media (max-width:480px) {
+@media (max-width: 480px) {
     .login-container {
-        padding:10px;
+        padding: 10px;
     }
     .card {
-        padding:20px;
+        padding: 20px;
     }
-    h1,h2 {
-        font-size:1.3em;
+    h1, h2 {
+        font-size: 1.3em;
     }
-    input,button {
-        padding:10px;
-        font-size:0.95em;
+    input, button {
+        padding: 10px;
+        font-size: 0.95em;
     }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity:0; transform: scale(0.9); }
+    to { opacity:1; transform: scale(1); }
 }
