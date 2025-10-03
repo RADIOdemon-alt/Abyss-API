@@ -116,7 +116,7 @@ window.login = async function() {
     await signInWithEmailAndPassword(auth, email, password);
     showWelcome(`🎉 مرحبًا بك!`);
     setTimeout(()=>{
-      window.location.href = "assets/pages/dashboard/index.html";
+      window.location.href = "pages/home/index.html";
     }, 1500);
   } catch(error) {
     let msg = "❌ البريد أو كلمة المرور غير صحيحة";
