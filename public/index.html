@@ -1,42 +1,84 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Abyss API</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Abyss-api</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="login-container">
+  <video autoplay muted loop playsinline id="bg-video">
+    <source src="https://files.catbox.moe/t1r7ws.mp4" type="video/mp4">
+  </video>
 
-    <!-- كارد تسجيل الدخول -->
-    <div class="card active" id="loginCard"> <!-- اضفت class active هنا -->
-        <h2>تسجيل الدخول</h2>
-        <form id="loginForm">
-            <input type="text" name="phone" placeholder="رقم الهاتف مع رمز الدولة بدون +" required>
-            <input type="password" name="password" placeholder="كلمة المرور" required>
-            <button type="submit">دخول</button>
-        </form>
-        <p class="switch" id="toRegister">تسجيل حساب جديد</p>
+  <div class="container">
+
+    <!-- رسائل الخطأ/النجاح -->
+    <div id="message-box" class="message-box hidden"></div>
+
+    <!-- الترحيب -->
+    <div id="welcome-box" class="welcome-box hidden"></div>
+
+    <!-- تسجيل الدخول -->
+    <div class="form-box" id="login-box">
+      <div class="card-avatar">
+        <img src="https://files.catbox.moe/caohoh.jpg" alt="Avatar">
+      </div>
+      <h2>تسجيل الدخول</h2>
+      <div class="input-group">
+        <i class="fa-solid fa-envelope"></i>
+        <input type="email" id="login-email" placeholder="البريد الإلكتروني" required>
+      </div>
+      <div class="input-group">
+        <i class="fa-solid fa-lock"></i>
+        <input type="password" id="login-password" placeholder="كلمة المرور" required>
+      </div>
+      <button type="button" onclick="login()">دخول</button>
+      <p>ليس لديك حساب؟
+        <a href="javascript:void(0)" onclick="toggleForms()">سجّل الآن</a>
+      </p>
     </div>
 
-    <!-- كارد تسجيل جديد -->
-    <div class="card" id="registerCard">
-        <h2>تسجيل جديد</h2>
-        <form id="registerForm">
-            <input type="text" name="name" placeholder="اسمك" required>
-            <input type="text" name="phone" placeholder="رقمك مع رمز الدولة بدون +" required>
-            <input type="email" name="email" placeholder="البريد الإلكتروني" required>
-            <input type="password" name="password" placeholder="كلمة المرور" required>
-            <input type="password" name="confirmPassword" placeholder="تأكيد كلمة المرور" required>
-            <button type="submit">تسجيل</button>
-        </form>
-        <p class="switch" id="toLogin">العودة لتسجيل الدخول</p>
+    <!-- تسجيل جديد -->
+    <div class="form-box hidden" id="register-box">
+      <div class="card-avatar">
+        <img src="https://files.catbox.moe/caohoh.jpg" alt="Avatar">
+      </div>
+      <h2>إنشاء حساب</h2>
+      <div class="input-group">
+        <i class="fa-solid fa-user"></i>
+        <input type="text" id="reg-name" placeholder="الاسم الكامل" required>
+      </div>
+      <div class="input-group">
+        <i class="fa-solid fa-flag"></i>
+        <div class="custom-select" id="country-select">
+          <div class="selected">اختر الدولة</div>
+          <ul class="options hidden" id="country-options"></ul>
+        </div>
+      </div>
+      <div class="input-group">
+        <i class="fa-solid fa-phone"></i>
+        <input type="text" id="reg-phone" placeholder="رقم الهاتف" required>
+      </div>
+      <div class="input-group">
+        <i class="fa-solid fa-envelope"></i>
+        <input type="email" id="reg-email" placeholder="البريد الإلكتروني" required>
+      </div>
+      <div class="input-group">
+        <i class="fa-solid fa-lock"></i>
+        <input type="password" id="reg-password" placeholder="كلمة المرور" required>
+      </div>
+      <button type="button" onclick="register()">تسجيل</button>
+      <p>هل لديك حساب بالفعل؟
+        <a href="javascript:void(0)" onclick="toggleForms()">سجّل دخول</a>
+      </p>
     </div>
+  </div>
 
-</div>
-
-<script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
