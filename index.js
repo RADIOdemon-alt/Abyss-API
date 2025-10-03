@@ -15,12 +15,22 @@ app.use(express.json());
 // ملفات static
 app.use(express.static(path.join(__dirname, 'public')));
 
-// مسارات API يجب أن تكون قبل الـ fallback
+// مسارات API
 app.use('/api/tr', tools_tr);
 
-// fallback لأي طلب غير API → صفحة index
+// مسار الهوم بشكل صريح
+app.get('/page/home', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'page', 'home', 'index.html'));
+});
+
+// مسار تسجيل الدخول
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// fallback لأي طلب غير API وغير محدد → login
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'page', 'login', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // تشغيل السيرفر
