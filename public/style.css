@@ -17,9 +17,9 @@ body {
 
 .login-container {
     position:relative;
-    width:300px; /* حجم الكارد طبيعي */
-    max-width:85vw;
-    max-height:85vh;
+    width:320px; /* حجم الكارد طبيعي */
+    max-width:90vw;
+    max-height:90vh;
     display:flex;
     justify-content:center;
     align-items:center;
@@ -28,26 +28,26 @@ body {
 /* الكاردات */
 .card {
     background:#111;
-    padding:30px; /* padding طبيعي */
+    padding:30px;
     border-radius:15px;
     box-shadow:
-        0 0 5px rgba(255,0,85,0.2),
-        0 0 15px rgba(255,0,85,0.1);
+        0 0 10px rgba(255,0,85,0.3),
+        0 0 20px rgba(255,0,85,0.2);
     position:absolute;
-    width:90%;
+    width:100%;
     top:50%;
     left:50%;
-    transform:translate(-50%, 20px);
+    transform:translate(-50%, 20px) scale(0.95);
     opacity:0;
     pointer-events:none;
     transition: all 0.5s ease;
-    overflow-y:auto; /* Scroll لو الشاشة صغيرة */
+    overflow-y:auto;
     max-height:80vh;
 }
 
 .card.active {
     opacity:1;
-    transform:translate(-50%, -50%);
+    transform:translate(-50%, -50%) scale(1);
     pointer-events:auto;
 }
 
@@ -62,17 +62,17 @@ form {
     display:flex;
     flex-direction:column;
     gap:10px;
-    margin-bottom:10px;
+    margin-bottom:15px;
 }
 
 input,button {
-    padding:10px;
+    padding:12px;
     border-radius:8px;
     border:none;
     outline:none;
     font-family:'Cairo', sans-serif;
     font-size:1em;
-    text-align:right; /* النصوص داخل الحقول من اليمين */
+    text-align:right;
 }
 
 input {
@@ -100,4 +100,17 @@ button:hover {
     cursor:pointer;
     margin-top:10px;
     font-size:0.95em;
+    display:block;
+}
+
+/* Scrollbar لطيف للكارد */
+.card::-webkit-scrollbar {
+    width:6px;
+}
+.card::-webkit-scrollbar-track {
+    background:transparent;
+}
+.card::-webkit-scrollbar-thumb {
+    background:#ff0055;
+    border-radius:3px;
 }
