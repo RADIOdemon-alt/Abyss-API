@@ -5,17 +5,13 @@ const toRegister = document.getElementById("toRegister");
 const toLogin = document.getElementById("toLogin");
 
 // عند البداية يظهر كارد تسجيل الدخول
-loginCard.style.transform = "rotateY(0deg)";
-loginCard.style.opacity = "1";
-registerCard.style.transform = "rotateY(15deg)";
-registerCard.style.opacity = "0";
+loginCard.classList.add("active");
+registerCard.classList.remove("active");
 
-// دالة تبديل الكارد مع دوران خفيف
+// دالة تبديل الكارد
 function showCard(cardToShow, cardToHide) {
-    cardToHide.style.transform = "rotateY(-15deg)";
-    cardToHide.style.opacity = "0";
-    cardToShow.style.transform = "rotateY(0deg)";
-    cardToShow.style.opacity = "1";
+    cardToHide.classList.remove("active");
+    cardToShow.classList.add("active");
 }
 
 // التحويل لتسجيل جديد
@@ -32,17 +28,20 @@ toLogin.onclick = () => {
 document.getElementById("loginForm").onsubmit = async e => {
     e.preventDefault();
     const form = e.target;
-    const data = { phone: form.phone.value, password: form.password.value };
+    const data = {
+        phone: form.phone.value,
+        password: form.password.value
+    };
 
     try {
         const res = await fetch("/api/auth/login", {
-            method:"POST",
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify(data)
+            method: "POST",
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
         });
         const text = await res.text();
         alert(text);
-    } catch(err) {
+    } catch (err) {
         alert("❌ حدث خطأ أثناء تسجيل الدخول");
         console.error(err);
     }
@@ -53,7 +52,8 @@ document.getElementById("registerForm").onsubmit = async e => {
     e.preventDefault();
     const form = e.target;
 
-    if(!form.terms.checked){
+    // التحقق من الشروط والأحكام
+    if (!form.terms.checked) {
         alert("❌ يجب الموافقة على الشروط والأحكام");
         return;
     }
@@ -68,13 +68,13 @@ document.getElementById("registerForm").onsubmit = async e => {
 
     try {
         const res = await fetch("/api/auth/register", {
-            method:"POST",
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify(data)
+            method: "POST",
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
         });
         const text = await res.text();
         alert(text);
-    } catch(err) {
+    } catch (err) {
         alert("❌ حدث خطأ أثناء إنشاء الحساب");
         console.error(err);
     }
