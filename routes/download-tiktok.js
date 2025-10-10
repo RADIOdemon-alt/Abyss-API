@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
 
   res.json({
     status: true,
-    creator: 'IZANA',
+    creator: 'IZANA|RADIO',
     result: result
   });
 });
