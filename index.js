@@ -4,8 +4,8 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 import tools_tr from './routes/tools-tr.js';
+import pinterest from './routes/download-pinterest.js';
 
-const app = express();
 const port = process.env.PORT || 3000;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,7 +19,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/tr', tools_tr);
-
+app.use('/api/pinterest', pinterest);
+const app = express();
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
