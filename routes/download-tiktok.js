@@ -11,6 +11,22 @@ function extractUrl(url) {
   return url;
 }
 
+// دالة لتوسيع الروابط القصيرة TikTok
+async function expandTikTokURL(url) {
+  try {
+    const res = await axios.head(url, { maxRedirects: 0, validateStatus: s => s >= 200 && s < 400 });
+    if (res.status === 301 || res.status === 302) return res.headers.location;
+    return url;
+  } catch (err) {
+    // تجربة GET إذا HEAD فشل
+    try {
+      const res = await axios.get(url, { maxRedirects: 0, validateStatus: s => s < 400 });
+      if (res.status === 301 || res.status === 302) return res.headers.location;
+    } catch {}
+    return url;
+  }
+}
+
 // دالة تحميل فيديو TikTok HD
 async function downloadTikTokHD(url) {
   const cfg = { headers: { 'user-agent': 'Mozilla/5.0' } };
@@ -45,19 +61,22 @@ async function downloadTikTokHD(url) {
 
 // GET /api/tiktokhd?url=...
 router.get('/', async (req, res) => {
-  const url = req.query.url;
+  let url = req.query.url;
   if (!url) return res.json({
     status: true,
-    creator: 'Anas radio',
+    creator: 'IZANA',
     message: "📌 أرسل رابط TikTok في 'url' مثل /api/tiktokhd?url=https://www.tiktok.com/@user/video/1234567890"
   });
+
+  // تحويل الرابط القصير للرابط الكامل
+  url = await expandTikTokURL(url);
 
   const result = await downloadTikTokHD(url);
   if (!result.status) return res.json(result);
 
   res.json({
     status: true,
-    creator: 'Anas radio',
+    creator: 'IZANA',
     result: result
   });
 });
