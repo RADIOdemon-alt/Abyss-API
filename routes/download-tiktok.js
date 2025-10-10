@@ -4,25 +4,20 @@ import cheerio from 'cheerio';
 
 const router = express.Router();
 
-// دالة لاستخراج الرابط من base64
-function extractUrl(url) {
-  let match = url?.match(/\/(hd|dl|mp3)\/([A-Za-z0-9+/=]+)/);
-  if (match && match[2]) return Buffer.from(match[2], 'base64').toString('utf-8');
-  return url;
-}
-
-// دالة لتوسيع الروابط القصيرة TikTok
-async function expandTikTokURL(url) {
+// دالة لاستخراج الرابط من base64 أو من روابط الاختصار
+async function extractUrl(url) {
   try {
-    const res = await axios.head(url, { maxRedirects: 0, validateStatus: s => s >= 200 && s < 400 });
-    if (res.status === 301 || res.status === 302) return res.headers.location;
-    return url;
-  } catch (err) {
-    try {
-      const res = await axios.get(url, { maxRedirects: 0, validateStatus: s => s < 400 });
-      if (res.status === 301 || res.status === 302) return res.headers.location;
-    } catch {}
-    return url;
+    // إذا كان الرابط مشفر base64 داخل مسار
+    let match = url?.match(/\/(hd|dl|mp3)\/([A-Za-z0-9+/=]+)/);
+    if (match && match[2]) {
+      return Buffer.from(match[2], 'base64').toString('utf-8');
+    }
+
+    // محاولة متابعة أي redirect للحصول على الرابط النهائي
+    const res = await axios.get(url, { maxRedirects: 5, headers: { 'user-agent': 'Mozilla/5.0' } });
+    return res.request.res.responseUrl || url; // الرابط النهائي بعد أي redirect
+  } catch (e) {
+    return url; // لو فشل، نرجع الرابط الأصلي
   }
 }
 
@@ -32,6 +27,7 @@ async function downloadTikTokHD(url) {
   try {
     let res = await axios.get('https://musicaldown.com/id/download', cfg);
     const $ = cheerio.load(res.data);
+
     const url_name = $('#link_url').attr('name');
     const ko = $('#submit-form > div');
     const token = ko.find('div.inputbg input[type=hidden]:nth-child(2)');
@@ -48,7 +44,8 @@ async function downloadTikTokHD(url) {
     });
 
     const $dl = cheerio.load(dlPage.data);
-    const videoHdLink = extractUrl($dl('a[data-event="hd_download_click"]').attr('href'));
+    const rawHdLink = $dl('a[data-event="hd_download_click"]').attr('href');
+    const videoHdLink = await extractUrl(rawHdLink); // استخدم الدالة الجديدة
 
     if (!videoHdLink) throw new Error('فشل استخراج رابط الفيديو HD');
     return { status: true, video_hd: videoHdLink };
@@ -67,15 +64,10 @@ router.get('/', async (req, res) => {
     message: "📌 أرسل رابط TikTok في 'url' مثل /api/tiktokhd?url=https://www.tiktok.com/@user/video/1234567890"
   });
 
-  url = await expandTikTokURL(url);
   const result = await downloadTikTokHD(url);
   if (!result.status) return res.json(result);
 
-  res.json({
-    status: true,
-    creator: 'Dark team',
-    result
-  });
+  res.json({ status: true, creator: 'Dark team', result });
 });
 
 // POST API /api/tiktokhd
@@ -87,15 +79,10 @@ router.post('/', async (req, res) => {
     message: "📌 أرسل رابط TikTok في 'url' ضمن JSON مثل { url: '...' }"
   });
 
-  url = await expandTikTokURL(url);
   const result = await downloadTikTokHD(url);
   if (!result.status) return res.json(result);
 
-  res.json({
-    status: true,
-    creator: 'Dark team',
-    result
-  });
+  res.json({ status: true, creator: 'Dark team', result });
 });
 
 export default router;
