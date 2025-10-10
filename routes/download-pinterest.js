@@ -22,7 +22,7 @@ async function getCookies() {
     const setHeaders = response.headers['set-cookie'];
     if (setHeaders) return setHeaders.map(c => c.split(';')[0].trim()).join('; ');
     return null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -62,20 +62,27 @@ async function searchPinterest(query) {
         }
       }))
     };
-  } catch (err) {
+  } catch {
     return { status: false, message: "❌ حدث خطأ أثناء البحث، أعد المحاولة لاحقًا." };
   }
 }
 
-// POST /api/pinterest
+// ✅ POST /api/pinterest
 router.post('/', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ status: false, message: "⚠️ يرجى إرسال query" });
 
   const result = await searchPinterest(query);
-  if (!result.status) return res.status(500).json(result);
+  return res.status(result.status ? 200 : 500).json(result);
+});
 
-  res.json(result);
+// ✅ GET /api/pinterest (اختياري لعرض توضيحي)
+router.get('/', (req, res) => {
+  res.json({
+    status: true,
+    creator: "Anas radio",
+    message: "📌 أرسل POST إلى هذا الرابط مع { query: 'كلمة البحث' }"
+  });
 });
 
 export default router;
