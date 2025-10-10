@@ -18,7 +18,6 @@ async function expandTikTokURL(url) {
     if (res.status === 301 || res.status === 302) return res.headers.location;
     return url;
   } catch (err) {
-    // تجربة GET إذا HEAD فشل
     try {
       const res = await axios.get(url, { maxRedirects: 0, validateStatus: s => s < 400 });
       if (res.status === 301 || res.status === 302) return res.headers.location;
@@ -59,25 +58,43 @@ async function downloadTikTokHD(url) {
   }
 }
 
-// GET /api/tiktokhd?url=...
+// GET API /api/tiktokhd?url=...
 router.get('/', async (req, res) => {
   let url = req.query.url;
   if (!url) return res.json({
     status: true,
-    creator: 'IZANA',
+    creator: 'Dark team',
     message: "📌 أرسل رابط TikTok في 'url' مثل /api/tiktokhd?url=https://www.tiktok.com/@user/video/1234567890"
   });
 
-  // تحويل الرابط القصير للرابط الكامل
   url = await expandTikTokURL(url);
-
   const result = await downloadTikTokHD(url);
   if (!result.status) return res.json(result);
 
   res.json({
     status: true,
-    creator: 'IZANA|RADIO',
-    result: result
+    creator: 'Dark team',
+    result
+  });
+});
+
+// POST API /api/tiktokhd
+router.post('/', async (req, res) => {
+  let url = req.body.url;
+  if (!url) return res.status(400).json({
+    status: false,
+    creator: 'Dark team',
+    message: "📌 أرسل رابط TikTok في 'url' ضمن JSON مثل { url: '...' }"
+  });
+
+  url = await expandTikTokURL(url);
+  const result = await downloadTikTokHD(url);
+  if (!result.status) return res.json(result);
+
+  res.json({
+    status: true,
+    creator: 'Dark team',
+    result
   });
 });
 
