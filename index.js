@@ -11,7 +11,9 @@ const port = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const app = express();
 
+app.use(express.json());
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
@@ -20,7 +22,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
-const app = express();
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
