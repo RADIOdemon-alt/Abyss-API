@@ -96,7 +96,7 @@ router.get('/', async (req, res) => {
   // لو مفيش query
   res.json({
     status: true,
-    creator: "Anas radio",
+    creator: "Dark-Team",
     message: "📌 أرسل POST إلى هذا الرابط مع { query: 'كلمة البحث' } أو GET بـ ?query=",
   });
 });
