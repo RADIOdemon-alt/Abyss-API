@@ -4,21 +4,18 @@ import crypto from "crypto";
 import multer from "multer";
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
-// 🧠 التخزين في الذاكرة بدل القرص
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
-// 🧩 دالة الذكاء الاصطناعي
-async function generateAIImage(imageBufferOrUrl, prompt) {
+// 🧠 نفس منطق الاسكراب المستخدم في البوت
+async function generateAIImage(imageInput, prompt) {
   const visitorId = crypto.randomUUID();
   let imageUrl;
 
-  // 🔹 إذا كانت الصورة رابط مباشر
-  if (typeof imageBufferOrUrl === "string" && /^https?:\/\//.test(imageBufferOrUrl)) {
-    imageUrl = imageBufferOrUrl;
+  // 🔹 لو الصورة من رابط مباشر
+  if (/^https?:\/\//.test(imageInput)) {
+    imageUrl = imageInput;
   } else {
-    // 🔹 رفع الصورة مباشرة من الذاكرة إلى السيرفر الخارجي
+    // 🔹 لو الصورة مرفوعة (Buffer)
     const fileName = `${crypto.randomUUID()}.jpg`;
     const bucket = "ai-image-editor";
     const pathName = `original/${fileName}`;
@@ -26,23 +23,23 @@ async function generateAIImage(imageBufferOrUrl, prompt) {
     const signed = await axios.post(
       "https://ai-image-editor.com/api/trpc/uploads.signedUploadUrl?batch=1",
       [{ json: { bucket, path: pathName } }],
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "Mozilla/5.0",
-        },
-      }
+      { headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" } }
     );
 
-    const uploadUrl = signed.data[0].result.data.json.url;
-    await axios.put(uploadUrl, imageBufferOrUrl, {
+    // ✅ استخراج رابط الرفع الصحيح
+    const uploadUrl =
+      signed.data?.[0]?.result?.data?.json?.data?.url ||
+      signed.data?.[0]?.result?.data?.json?.url;
+    if (!uploadUrl) throw new Error("❌ لم يتم الحصول على رابط الرفع.");
+
+    await axios.put(uploadUrl, imageInput, {
       headers: { "Content-Type": "image/jpeg" },
     });
 
     imageUrl = `https://files.ai-image-editor.com/${pathName}`;
   }
 
-  // 🔹 إنشاء مهمة المعالجة
+  // 🔹 إنشاء المهمة
   const task = await axios.post(
     "https://ai-image-editor.com/api/trpc/ai.createNanoBananaTask?batch=1",
     [
@@ -59,10 +56,11 @@ async function generateAIImage(imageBufferOrUrl, prompt) {
     { headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" } }
   );
 
-  const taskId = task.data[0].result.data.json.data.taskId;
-  let resultUrl = null;
+  const taskId = task.data?.[0]?.result?.data?.json?.data?.taskId;
+  if (!taskId) throw new Error("❌ لم يتم إنشاء المهمة.");
 
-  // 🔄 متابعة العملية حتى نحصل على النتيجة
+  // 🔁 الانتظار حتى النتيجة
+  let resultUrl = null;
   while (!resultUrl) {
     const check = await axios.get(
       `https://ai-image-editor.com/api/trpc/ai.queryNanoBananaTask?batch=1&input=${encodeURIComponent(
@@ -71,9 +69,11 @@ async function generateAIImage(imageBufferOrUrl, prompt) {
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
 
-    const data = check.data[0].result.data.json.data;
-    if (data.state === "success" && data.resultUrls?.length) {
+    const data = check.data?.[0]?.result?.data?.json?.data;
+    if (data?.state === "success" && data?.resultUrls?.length) {
       resultUrl = data.resultUrls[0];
+    } else if (data?.state === "failed") {
+      throw new Error("❌ فشل في معالجة الصورة.");
     } else {
       await new Promise((r) => setTimeout(r, 2500));
     }
@@ -82,14 +82,14 @@ async function generateAIImage(imageBufferOrUrl, prompt) {
   return resultUrl;
 }
 
-// 🌐 GET (برابط مباشر)
+// 🌐 GET — بالأسلوب: ?image=رابط&prompt=الوصف
 router.get("/", async (req, res) => {
   try {
     const { image, prompt } = req.query;
     if (!image || !prompt)
       return res.status(400).json({
         status: false,
-        error: "⚠️ أرسل الصورة والوصف، مثال: ?image=رابط&prompt=اجعلها أنمي",
+        error: "⚠️ أرسل الصورة والوصف: ?image=رابط&prompt=الوصف",
       });
 
     const result = await generateAIImage(image, prompt);
@@ -99,12 +99,12 @@ router.get("/", async (req, res) => {
       data: { prompt, input: image, result },
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌", err);
     res.status(500).json({ status: false, error: err.message });
   }
 });
 
-// 🌐 POST (رفع مباشر من الجهاز)
+// 🌐 POST — لرفع الصورة مباشرة
 router.post("/", upload.single("image"), async (req, res) => {
   try {
     const prompt = req.body.prompt;
@@ -121,7 +121,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       data: { prompt, result },
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌", err);
     res.status(500).json({ status: false, error: err.message });
   }
 });
