@@ -1,59 +1,54 @@
-import express from "express";
-import axios from "axios";
-import crypto from "crypto";
+import express from 'express';
+import axios from 'axios';
+import crypto from 'crypto';
 
 const router = express.Router();
-
-// 🧠 كاش بسيط في الذاكرة
-const cache = new Map();
-const CACHE_TIME = 1000 * 60 * 10; // 10 دقائق
 
 const savetube = {
   api: {
     base: "https://media.savetube.me/api",
     cdn: "/random-cdn",
     info: "/v2/info",
-    download: "/download",
+    download: "/download"
   },
   headers: {
-    accept: "*/*",
-    "content-type": "application/json",
-    origin: "https://yt.savetube.me",
-    referer: "https://yt.savetube.me/",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    'accept': '*/*',
+    'content-type': 'application/json',
+    'origin': 'https://yt.savetube.me',
+    'referer': 'https://yt.savetube.me/',
+    'user-agent': 'Postify/1.0.0'
   },
-
-  // 🎬 الجودات الافتراضية
-  formats: {
-    video: ["144", "240", "360", "480", "720", "1080", "1440", "2160"],
-    audio: ["mp3", "m4a", "webm"],
-  },
+  formats: ['144', '240', '360', '480', '720', '1080', 'mp3'],
 
   crypto: {
     hexToBuffer: (hexString) => {
       const matches = hexString.match(/.{1,2}/g);
-      return Buffer.from(matches.join(""), "hex");
+      return Buffer.from(matches.join(''), 'hex');
     },
     decrypt: async (enc) => {
-      const secretKey = "C5D58EF67A7584E4A29F6C35BBC4EB12";
-      const data = Buffer.from(enc, "base64");
+      const secretKey = 'C5D58EF67A7584E4A29F6C35BBC4EB12';
+      const data = Buffer.from(enc, 'base64');
       const iv = data.slice(0, 16);
       const content = data.slice(16);
       const key = savetube.crypto.hexToBuffer(secretKey);
-      const decipher = crypto.createDecipheriv("aes-128-cbc", key, iv);
+      const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
       let decrypted = decipher.update(content);
       decrypted = Buffer.concat([decrypted, decipher.final()]);
       return JSON.parse(decrypted.toString());
-    },
+    }
   },
 
-  youtube: (url) => {
+  isUrl: str => {
+    try { new URL(str); return true; } catch (_) { return false; }
+  },
+
+  youtube: url => {
     const patterns = [
       /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
       /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
       /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
       /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-      /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+      /youtu\.be\/([a-zA-Z0-9_-]{11})/
     ];
     for (let pattern of patterns) {
       if (pattern.test(url)) return url.match(pattern)[1];
@@ -61,140 +56,87 @@ const savetube = {
     return null;
   },
 
-  request: async (endpoint, data = {}, method = "post") => {
-    const { data: response } = await axios({
-      method,
-      url: `${endpoint.startsWith("http") ? "" : savetube.api.base}${endpoint}`,
-      data: method === "post" ? data : undefined,
-      params: method === "get" ? data : undefined,
-      headers: savetube.headers,
-    });
-    return response;
+  request: async (endpoint, data = {}, method = 'post') => {
+    try {
+      const { data: response } = await axios({
+        method,
+        url: `${endpoint.startsWith('http') ? '' : savetube.api.base}${endpoint}`,
+        data: method === 'post' ? data : undefined,
+        params: method === 'get' ? data : undefined,
+        headers: savetube.headers
+      });
+      return { status: true, code: 200, data: response };
+    } catch (error) {
+      return { status: false, code: error.response?.status || 500, error: error.message };
+    }
   },
 
   getCDN: async () => {
-    const { data } = await axios.get(`${savetube.api.base}${savetube.api.cdn}`, {
-      headers: savetube.headers,
-    });
-    return data.cdn;
+    const response = await savetube.request(savetube.api.cdn, {}, 'get');
+    if (!response.status) return response;
+    return { status: true, code: 200, data: response.data.cdn };
   },
 
-  download: async (link, format = "720") => {
-    if (!link) throw new Error("❌ يرجى إدخال رابط الفيديو.");
+  download: async (link, format) => {
+    if (!savetube.isUrl(link)) return { status: false, code: 400, error: "الرابط غير صالح." };
+    if (!format || !savetube.formats.includes(format)) return { status: false, code: 400, error: "صيغة غير مدعومة." };
+
     const id = savetube.youtube(link);
-    if (!id) throw new Error("❌ تعذر استخراج معرف الفيديو.");
+    if (!id) return { status: false, code: 400, error: "تعذر استخراج معرف الفيديو." };
 
-    // 🔁 تحقق من الكاش
-    const cacheKey = `${id}_${format}`;
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.time < CACHE_TIME) {
-      return { ...cached.data, cached: true };
-    }
+    const cdnx = await savetube.getCDN();
+    if (!cdnx.status) return cdnx;
+    const cdn = cdnx.data;
 
-    const cdn = await savetube.getCDN();
-
-    const info = await savetube.request(`https://${cdn}${savetube.api.info}`, {
-      url: `https://www.youtube.com/watch?v=${id}`,
+    const result = await savetube.request(`https://${cdn}${savetube.api.info}`, {
+      url: `https://www.youtube.com/watch?v=${id}`
     });
-    const decrypted = await savetube.crypto.decrypt(info.data);
 
-    // 🧩 استخراج الجودات المتاحة فعلاً
-    const available = decrypted?.links
-      ? decrypted.links.map((v) => ({
-          quality: v.quality,
-          type: v.mimeType.includes("audio") ? "audio" : "video",
-        }))
-      : [];
+    if (!result.status || !result.data?.data)
+      return { status: false, code: 500, error: "لم يتم استلام بيانات مشفرة." };
 
-    const isAudio = savetube.formats.audio.includes(format.toLowerCase());
-
-    // 🔍 البحث عن أقرب جودة متاحة
-    let targetQuality = format;
-    if (!isAudio) {
-      const availableQualities = available
-        .filter((v) => v.type === "video")
-        .map((v) => parseInt(v.quality));
-      const requested = parseInt(format);
-      if (availableQualities.length > 0 && !availableQualities.includes(requested)) {
-        const fallback = [...availableQualities].sort((a, b) => a - b).filter((q) => q <= requested);
-        targetQuality = fallback.length ? fallback.pop().toString() : availableQualities[0].toString();
-      }
-    }
+    const decrypted = await savetube.crypto.decrypt(result.data.data);
 
     const dl = await savetube.request(`https://${cdn}${savetube.api.download}`, {
       id: id,
-      downloadType: isAudio ? "audio" : "video",
-      quality: isAudio ? "128" : targetQuality,
-      key: decrypted.key,
+      downloadType: format === 'mp3' ? 'audio' : 'video',
+      quality: format === 'mp3' ? '128' : format,
+      key: decrypted.key
     });
 
-    const result = {
-      title: decrypted.title,
-      thumbnail: decrypted.thumbnail || `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
-      download: dl.data.data.downloadUrl,
-      format: targetQuality,
-      type: isAudio ? "audio" : "video",
-      duration: decrypted.duration,
-      id,
-      quality_selected: targetQuality,
-      available_qualities: available.length ? available : "لم تُكتشف جودات من المصدر",
+    return {
+      status: true,
+      code: 200,
+      result: {
+        title: decrypted.title,
+        type: format === 'mp3' ? 'audio' : 'video',
+        format,
+        thumbnail: decrypted.thumbnail || `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
+        download: dl.data.data.downloadUrl,
+        duration: decrypted.duration
+      }
     };
-
-    // 💾 تخزين في الكاش
-    cache.set(cacheKey, { time: Date.now(), data: result });
-
-    return result;
-  },
+  }
 };
 
-// ✅ POST /api/youtube
-router.post("/", async (req, res) => {
+// API route
+router.get('/', async (req, res) => {
   try {
-    const { url, format = "720" } = req.body;
-    if (!url)
-      return res.status(400).json({
-        status: false,
-        creator: "Anas radio",
-        message: "⚠️ أرسل الرابط في body مثل { url: '...', format: '720' }",
-      });
+    const url = req.query.url;
+    const format = req.query.format || '720';
+    if (!url) return res.status(400).json({ status: false, error: "يرجى إدخال الرابط." });
 
     const result = await savetube.download(url, format);
-    res.status(200).json({
+    if (!result.status) return res.status(result.code).json(result);
+
+    res.json({
       status: true,
-      creator: "Anas radio",
-      result,
-      default_formats: savetube.formats,
+      creator: "Anas Radio",
+      data: result.result
     });
   } catch (err) {
-    res.status(500).json({ status: false, creator: "Anas radio", error: err.message });
+    res.status(500).json({ status: false, error: err.message });
   }
-});
-
-// ✅ GET /api/youtube
-router.get("/", async (req, res) => {
-  const { url, format = "720" } = req.query;
-  if (url) {
-    try {
-      const result = await savetube.download(url, format);
-      return res.status(200).json({
-        status: true,
-        creator: "Anas radio",
-        result,
-        default_formats: savetube.formats,
-      });
-    } catch (err) {
-      return res.status(500).json({ status: false, creator: "Anas radio", error: err.message });
-    }
-  }
-
-  // لو مفيش url
-  res.json({
-    status: true,
-    creator: "Anas radio",
-    message:
-      "🎥 أرسل POST إلى هذا الرابط مع { url: 'رابط الفيديو', format: '720' } أو استخدم GET بـ ?url=",
-    default_formats: savetube.formats,
-  });
 });
 
 export default router;
