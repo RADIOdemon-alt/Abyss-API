@@ -2,45 +2,26 @@ import express from "express";
 import axios from "axios";
 import crypto from "crypto";
 import multer from "multer";
+import uploadImage from "../lib/uploadImage.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 🧠 نفس منطق الاسكراب المستخدم في البوت
-async function generateAIImage(imageInput, prompt) {
+// 🧠 دالة المعالجة (اسكراب مباشر)
+async function processAIEdit(imageInput, prompt) {
   const visitorId = crypto.randomUUID();
   let imageUrl;
 
-  // 🔹 لو الصورة من رابط مباشر
+  // 🔹 لو الصورة رابط مباشر
   if (/^https?:\/\//.test(imageInput)) {
     imageUrl = imageInput;
   } else {
     // 🔹 لو الصورة مرفوعة (Buffer)
-    const fileName = `${crypto.randomUUID()}.jpg`;
-    const bucket = "ai-image-editor";
-    const pathName = `original/${fileName}`;
-
-    const signed = await axios.post(
-      "https://ai-image-editor.com/api/trpc/uploads.signedUploadUrl?batch=1",
-      [{ json: { bucket, path: pathName } }],
-      { headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" } }
-    );
-
-    // ✅ استخراج رابط الرفع الصحيح
-    const uploadUrl =
-      signed.data?.[0]?.result?.data?.json?.data?.url ||
-      signed.data?.[0]?.result?.data?.json?.url;
-    if (!uploadUrl) throw new Error("❌ لم يتم الحصول على رابط الرفع.");
-
-    await axios.put(uploadUrl, imageInput, {
-      headers: { "Content-Type": "image/jpeg" },
-    });
-
-    imageUrl = `https://files.ai-image-editor.com/${pathName}`;
+    imageUrl = await uploadImage(imageInput);
   }
 
-  // 🔹 إنشاء المهمة
-  const task = await axios.post(
+  // 🔸 إنشاء المهمة
+  const createTask = await axios.post(
     "https://ai-image-editor.com/api/trpc/ai.createNanoBananaTask?batch=1",
     [
       {
@@ -53,14 +34,19 @@ async function generateAIImage(imageInput, prompt) {
         },
       },
     ],
-    { headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" } }
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0",
+      },
+    }
   );
 
-  const taskId = task.data?.[0]?.result?.data?.json?.data?.taskId;
-  if (!taskId) throw new Error("❌ لم يتم إنشاء المهمة.");
+  const taskId = createTask.data?.[0]?.result?.data?.json?.data?.taskId;
+  if (!taskId) throw new Error("❌ فشل إنشاء المهمة.");
 
-  // 🔁 الانتظار حتى النتيجة
-  let resultUrl = null;
+  // 🔁 التحقق حتى استلام النتيجة
+  let resultUrl;
   while (!resultUrl) {
     const check = await axios.get(
       `https://ai-image-editor.com/api/trpc/ai.queryNanoBananaTask?batch=1&input=${encodeURIComponent(
@@ -73,7 +59,7 @@ async function generateAIImage(imageInput, prompt) {
     if (data?.state === "success" && data?.resultUrls?.length) {
       resultUrl = data.resultUrls[0];
     } else if (data?.state === "failed") {
-      throw new Error("❌ فشل في معالجة الصورة.");
+      throw new Error("❌ فشل في المعالجة.");
     } else {
       await new Promise((r) => setTimeout(r, 2500));
     }
@@ -82,46 +68,46 @@ async function generateAIImage(imageInput, prompt) {
   return resultUrl;
 }
 
-// 🌐 GET — بالأسلوب: ?image=رابط&prompt=الوصف
+// 🌐 GET — معالجة عبر رابط مباشر
 router.get("/", async (req, res) => {
   try {
     const { image, prompt } = req.query;
     if (!image || !prompt)
       return res.status(400).json({
         status: false,
-        error: "⚠️ أرسل الصورة والوصف: ?image=رابط&prompt=الوصف",
+        error: "⚠️ أرسل الصورة والوصف عبر ?image=الرابط&prompt=الوصف",
       });
 
-    const result = await generateAIImage(image, prompt);
+    const result = await processAIEdit(image, prompt);
     res.json({
       status: true,
       creator: "Dark Team",
-      data: { prompt, input: image, result },
+      data: { input: image, prompt, result },
     });
   } catch (err) {
-    console.error("❌", err);
+    console.error("❌", err.message);
     res.status(500).json({ status: false, error: err.message });
   }
 });
 
-// 🌐 POST — لرفع الصورة مباشرة
+// 🌐 POST — معالجة عبر رفع الصورة (Form-Data)
 router.post("/", upload.single("image"), async (req, res) => {
   try {
-    const prompt = req.body.prompt;
+    const { prompt } = req.body;
     if (!req.file || !prompt)
       return res.status(400).json({
         status: false,
-        error: "⚠️ أرسل الصورة مع الوصف.",
+        error: "⚠️ أرسل الصورة مع الوصف في Form-Data (image, prompt)",
       });
 
-    const result = await generateAIImage(req.file.buffer, prompt);
+    const result = await processAIEdit(req.file.buffer, prompt);
     res.json({
       status: true,
       creator: "Dark Team",
       data: { prompt, result },
     });
   } catch (err) {
-    console.error("❌", err);
+    console.error("❌", err.message);
     res.status(500).json({ status: false, error: err.message });
   }
 });
