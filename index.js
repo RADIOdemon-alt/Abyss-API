@@ -27,7 +27,7 @@ app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
 app.use('/api/youtube', youtube);
-app.use('/api/image-edit', image_edit);
+app.use('/api/nano_banana', image_edit);
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
