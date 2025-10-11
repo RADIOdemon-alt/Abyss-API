@@ -7,6 +7,7 @@ import tools_tr from './routes/tools-tr.js';
 import pinterest from './routes/download-pinterest.js';
 import tiktok from './routes/download-tiktok.js';
 import youtube from './routes/download-youtube.js';
+import image_edit from './routes/image-edit.js';
 
 const port = process.env.PORT || 3000;
 
@@ -26,6 +27,7 @@ app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
 app.use('/api/youtube', youtube);
+app.use('/api/image-edit', image_edit);
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
