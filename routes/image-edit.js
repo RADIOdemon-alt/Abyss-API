@@ -7,24 +7,24 @@ import uploadImage from "../lib/uploadImage.js";
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 🧠 دالة المعالجة (اسكراب مباشر)
+// 🧠 دالة الذكاء الاصطناعي (نفس منطق الاسكراب الأصلي)
 async function processAIEdit(imageInput, prompt) {
   const visitorId = crypto.randomUUID();
   let imageUrl;
 
-  // 🔹 لو الصورة رابط مباشر
+  // لو الصورة رابط مباشر
   if (/^https?:\/\//.test(imageInput)) {
     imageUrl = imageInput;
   } else {
-    // 🔹 لو الصورة مرفوعة (Buffer)
+    // لو الصورة مرفوعة (Buffer)
     imageUrl = await uploadImage(imageInput);
   }
 
-  // 🔸 إنشاء المهمة
+  // 🔸 إنشاء المهمة (تم تصحيح صيغة البيانات)
   const createTask = await axios.post(
     "https://ai-image-editor.com/api/trpc/ai.createNanoBananaTask?batch=1",
-    [
-      {
+    {
+      0: {
         json: {
           imageUrls: [imageUrl],
           prompt,
@@ -33,7 +33,7 @@ async function processAIEdit(imageInput, prompt) {
           nVariants: 1,
         },
       },
-    ],
+    },
     {
       headers: {
         "Content-Type": "application/json",
@@ -45,12 +45,12 @@ async function processAIEdit(imageInput, prompt) {
   const taskId = createTask.data?.[0]?.result?.data?.json?.data?.taskId;
   if (!taskId) throw new Error("❌ فشل إنشاء المهمة.");
 
-  // 🔁 التحقق حتى استلام النتيجة
-  let resultUrl;
+  // 🔁 متابعة النتيجة
+  let resultUrl = null;
   while (!resultUrl) {
     const check = await axios.get(
       `https://ai-image-editor.com/api/trpc/ai.queryNanoBananaTask?batch=1&input=${encodeURIComponent(
-        JSON.stringify([{ json: { taskId, visitorId } }])
+        JSON.stringify({ 0: { json: { taskId, visitorId } } })
       )}`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
@@ -59,7 +59,7 @@ async function processAIEdit(imageInput, prompt) {
     if (data?.state === "success" && data?.resultUrls?.length) {
       resultUrl = data.resultUrls[0];
     } else if (data?.state === "failed") {
-      throw new Error("❌ فشل في المعالجة.");
+      throw new Error("❌ فشل في معالجة الصورة.");
     } else {
       await new Promise((r) => setTimeout(r, 2500));
     }
