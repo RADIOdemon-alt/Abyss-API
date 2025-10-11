@@ -131,7 +131,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       status: true,
-      creator: "Anas Radio",
+      creator: "Dark-Team",
       data: result.result
     });
   } catch (err) {
