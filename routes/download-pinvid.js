@@ -4,7 +4,6 @@ import cheerio from "cheerio";
 
 const router = express.Router();
 
-// 🌐 الأساسيات
 const base = "https://www.pinterest.com";
 const search = "/resource/BaseSearchResource/get/";
 
@@ -19,7 +18,6 @@ const headers = {
   "x-requested-with": "XMLHttpRequest",
 };
 
-// 🔹 الحصول على الكوكيز من Pinterest
 async function getCookies() {
   try {
     const response = await axios.get(base, { headers });
@@ -32,7 +30,6 @@ async function getCookies() {
   }
 }
 
-// 🔹 استخراج كل الروابط من الكائن
 function findAllUrls(obj, acc = new Set()) {
   if (!obj) return acc;
   if (typeof obj === "string") {
@@ -50,7 +47,6 @@ function findAllUrls(obj, acc = new Set()) {
   return acc;
 }
 
-// 🔹 تحديد إذا كان الرابط من Pinterest CDN
 function looksLikePinterestHosted(u) {
   if (!u) return false;
   const l = u.toLowerCase();
@@ -61,10 +57,8 @@ function looksLikePinterestHosted(u) {
   return false;
 }
 
-// 🔹 بحث فيديوهات Pinterest
 async function searchPinterestVideos(query) {
-  if (!query)
-    return { status: false, message: "⚠️ يرجى كتابة كلمة للبحث!" };
+  if (!query) return { status: false, message: "⚠️ يرجى كتابة كلمة للبحث!" };
 
   try {
     const cookies = await getCookies();
@@ -148,12 +142,12 @@ async function searchPinterestVideos(query) {
   }
 }
 
-// 🔹 تحميل الفيديو من Pinterest Downloader (الإصدار المضمون)
 async function pindl(url) {
   try {
-    const api = "https://pinterestdownloader.io/frontendService/DownloaderService";
-    const response = await axios.post(
-      api,
+    const apiEndpoint =
+      "https://pinterestdownloader.io/frontendService/DownloaderService";
+    const { data } = await axios.post(
+      apiEndpoint,
       { url },
       {
         headers: {
@@ -163,43 +157,42 @@ async function pindl(url) {
           "user-agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
         },
-        timeout: 20000,
       }
     );
-
-    const medias = response?.data?.medias || [];
+    const medias = data?.medias || [];
     const video = medias.find((m) => m.type === "video") || medias[0];
-
     if (!video?.url) throw new Error("لم يتم العثور على رابط فيديو صالح");
-
     return {
       status: true,
-      title: response.data.title || "بدون عنوان",
-      thumbnail: response.data.thumbnail,
-      duration: response.data.duration || null,
+      title: data.title || "بدون عنوان",
+      thumbnail: data.thumbnail,
+      duration: data.duration || null,
       video_url: video.url,
       quality: video.quality || "غير محددة",
+      medias,
     };
-  } catch (err) {
-    throw new Error("فشل في جلب الفيديو من downloader: " + err.message);
+  } catch (e) {
+    return { status: false, message: e.message };
   }
 }
 
-// 🔸 POST /api/pinterest/videos
 router.post("/", async (req, res) => {
   const { query } = req.body;
   if (!query)
     return res
       .status(400)
       .json({ status: false, message: "⚠️ يرجى إرسال query" });
-
   const result = await searchPinterestVideos(query);
-  return res.status(result.status ? 200 : 500).json(result);
+  res.status(result.status ? 200 : 500).json(result);
 });
 
-// 🔸 GET /api/pinterest/videos?query=cats
 router.get("/", async (req, res) => {
-  const { query } = req.query;
+  const { query, url } = req.query;
+
+  if (url) {
+    const result = await pindl(url);
+    return res.status(result.status ? 200 : 500).json(result);
+  }
 
   if (query) {
     const result = await searchPinterestVideos(query);
@@ -210,28 +203,8 @@ router.get("/", async (req, res) => {
     status: true,
     creator: "Radio Demon",
     message:
-      "📌 استخدم GET بـ ?query= أو POST إلى هذا الرابط مع { query: 'كلمة البحث' }",
+      "📌 استخدم GET بـ ?query= للبحث أو ?url= لتحميل الفيديو أو POST مع { query: '...' }",
   });
-});
-
-// 🔸 GET /api/pinterest/download?url=https://pinterest.com/pin/....
-router.get("/", async (req, res) => {
-  const { url } = req.query;
-  if (!url)
-    return res
-      .status(400)
-      .json({ status: false, message: "⚠️ أرسل ?url= رابط الفيديو" });
-
-  try {
-    const info = await pindl(url);
-    res.json({ status: true, ...info });
-  } catch (e) {
-    res.status(500).json({
-      status: false,
-      message: "❌ فشل تحميل الفيديو من الخدمة.",
-      error: e.message,
-    });
-  }
 });
 
 export default router;
