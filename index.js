@@ -12,6 +12,7 @@ import pinvid from './routes/download-pinvid.js';
 import pinvid_dl from './routes/download-pinvid-dl.js';
 import cat_art from './routes/Ai-cat-art.js';
 import search_applemusic from './routes/search-applemusic.js';
+import search_tiktok from './routes/search-tiktok.js';
 //------------------------------------------------------- 
 const port = process.env.PORT || 3000;
 //------------------------------------------------------
@@ -36,6 +37,7 @@ app.use('/api/pin_vid', pinvid);
 app.use('/api/pinvid_dl', pinvid_dl);
 app.use('/api/cat_art', cat_art);
 app.use('/api/search_applemusic', search_applemusic);
+app.use('/api/search_tiktok', search_tiktok);
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
