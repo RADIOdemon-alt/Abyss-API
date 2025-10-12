@@ -1,98 +1,113 @@
-import express from 'express';
-import axios from 'axios';
-import cheerio from 'cheerio';
+import express from "express";
+import axios from "axios";
+import cheerio from "cheerio";
 
 const router = express.Router();
 
-// دالة لاستخراج الرابط من base64 أو متابعة redirect
-async function extractUrl(url) {
-  if (!url) return null;
+// 🌀 دالة لتوسيع الروابط المختصرة
+async function expandURL(url) {
   try {
-    // إذا كان الرابط مشفر base64 داخل مسار
-    let match = url.match(/\/(hd|dl|mp3)\/([A-Za-z0-9+/=]+)/);
-    if (match && match[2]) {
-      return Buffer.from(match[2], 'base64').toString('utf-8');
-    }
-
-    // محاولة متابعة أي redirect للحصول على الرابط النهائي
-    const res = await axios.get(url, { maxRedirects: 5, headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 10)' } });
-    return res.request.res.responseUrl || url;
+    const response = await axios.head(url, { maxRedirects: 5 });
+    return response.request.res.responseUrl || url;
   } catch (e) {
+    console.warn("فشل في توسيع الرابط، سيتم استخدام الرابط الأصلي:", e.message);
     return url;
   }
 }
 
-// دالة تحميل فيديو TikTok HD عبر musicaldown.com
-async function downloadTikTokHD(tiktokUrl) {
-  const cfg = { headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 10)' } };
-  try {
-    // الصفحة الرئيسية لاستخراج الـ tokens
-    let res = await axios.get('https://musicaldown.com/id/download', cfg);
-    const $ = cheerio.load(res.data);
+// 🌀 دالة تحميل فيديو من TikTok
+const headers = {
+  authority: "ttsave.app",
+  accept: "application/json, text/plain, */*",
+  origin: "https://ttsave.app",
+  referer: "https://ttsave.app/en",
+  "user-agent": "Postify/1.0.0",
+};
 
-    const url_name = $('#link_url').attr('name');
-    const ko = $('#submit-form > div');
-    const token = ko.find('div.inputbg input[type=hidden]:nth-child(2)');
-    const verify = ko.find('div.inputbg input[type=hidden]:nth-child(3)');
+const ttsave = {
+  submit: async function (url, referer) {
+    const headerx = { ...headers, referer };
+    const data = { query: url, language_id: "1" };
+    return axios.post("https://ttsave.app/download", data, { headers: headerx });
+  },
 
-    const data = {
-      [url_name]: tiktokUrl,
-      [token.attr('name')]: token.attr('value'),
-      verify: verify.attr('value')
+  parse: function ($) {
+    const nickname = $("h2.font-extrabold").text();
+    const username = $("a.font-extrabold.text-blue-400").text();
+    const description = $("p.text-gray-600").text();
+
+    const dlink = {
+      nowm: $("a.w-full.text-white.font-bold").first().attr("href"),
+      wm: $("a.w-full.text-white.font-bold").eq(1).attr("href"),
+      audio: $("a[type='audio']").attr("href"),
     };
 
-    // إرسال POST لتحصل على صفحة التحميل
-    let dlPage = await axios.post('https://musicaldown.com/id/download', new URLSearchParams(data), {
-      headers: { ...cfg.headers, cookie: res.headers['set-cookie']?.join('; ') || '' }
-    });
+    const slides = $("a[type='slide']")
+      .map((i, el) => ({ number: i + 1, url: $(el).attr("href") }))
+      .get();
 
-    const $dl = cheerio.load(dlPage.data);
+    return { nickname, username, description, dlink, slides };
+  },
 
-    // التحقق من المحتوى
-    if ($dl('div.card-image').length > 0) {
-      return { status: false, message: 'Slide content, video only supported' };
+  video: async function (link) {
+    try {
+      const expandedLink = await expandURL(link);
+      const response = await this.submit(expandedLink, "https://ttsave.app/en");
+      const $ = cheerio.load(response.data);
+      const result = this.parse($);
+
+      if (result.slides && result.slides.length > 0) {
+        return { type: "slide", ...result };
+      }
+
+      return {
+        type: "video",
+        ...result,
+        videoInfo: { nowm: result.dlink.nowm, wm: result.dlink.wm },
+        audioUrl: result.dlink.audio,
+      };
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
+  },
+};
 
-    const rawHdLink = $dl('a[data-event="hd_download_click"]').attr('href');
-    const rawVideoLink = $dl('a[data-event="mp4_download_click"]').attr('href');
-    const rawWmLink = $dl('a[data-event="watermark_download_click"]').attr('href');
+// ⚙️ GET + POST endpoint
+router.all("/", async (req, res) => {
+  let url = req.query.url || req.body.url;
 
-    // استخراج الروابط النهائية
-    const videoHd = rawHdLink ? await extractUrl(rawHdLink) : null;
-    const video = rawVideoLink ? await extractUrl(rawVideoLink) : null;
-    const videoWm = rawWmLink ? await extractUrl(rawWmLink) : null;
-
-    return { status: true, type: 'video', video: videoHd || video || videoWm };
-
-  } catch (e) {
-    return { status: false, message: `فشل التحميل: ${e.message}` };
+  if (!url) {
+    return res.status(400).json({
+      status: false,
+      message: "📌 أرسل رابط فيديو من TikTok مثل:\n/api/tiktok?url=https://www.tiktok.com/@user/video/1234567890",
+    });
   }
-}
 
-// GET API /api/tiktokhd?url=...
-router.get('/', async (req, res) => {
-  let url = req.query.url;
-  if (!url) return res.json({
-    status: false,
-    creator: 'Dark team',
-    message: "📌 أرسل رابط TikTok في 'url' مثل /api/tiktokhd?url=https://www.tiktok.com/@user/video/1234567890"
-  });
+  try {
+    const videoResult = await ttsave.video(url);
+    const { type, nickname, username, description, videoInfo, slides, audioUrl } = videoResult;
 
-  const result = await downloadTikTokHD(url);
-  res.json({ status: result.status, creator: 'Dark team', result });
-});
+    const result = {
+      status: true,
+      type,
+      nickname: nickname || "-",
+      username: username || "-",
+      description: description || "-",
+      slides: slides || [],
+      video: videoInfo || {},
+      audio: audioUrl || null,
+      message: "✅ تم جلب بيانات الفيديو بنجاح",
+    };
 
-// POST API /api/tiktokhd
-router.post('/', async (req, res) => {
-  let url = req.body.url;
-  if (!url) return res.status(400).json({
-    status: false,
-    creator: 'Dark team',
-    message: "📌 أرسل رابط TikTok في 'url' ضمن JSON مثل { url: '...' }"
-  });
-
-  const result = await downloadTikTokHD(url);
-  res.json({ status: result.status, creator: 'Dark team', result });
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({
+      status: false,
+      message: `⚠️ حدث خطأ أثناء التحميل: ${e.message || e}`,
+    });
+  }
 });
 
 export default router;
