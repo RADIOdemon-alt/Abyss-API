@@ -9,10 +9,9 @@ import tiktok from './routes/download-tiktok.js';
 import youtube from './routes/download-youtube.js';
 import image_edit from './routes/image-edit.js';
 import pinvid from './routes/download-pinvid.js';
-
 import pinvid_dl from './routes/download-pinvid-dl.js';
+import cat_art from './routes/Ai-cat-art.js';
 
-import cat_art.js from './routes/Ai-cat-art.js';
 const port = process.env.PORT || 3000;
 
 const __filename = fileURLToPath(import.meta.url);
