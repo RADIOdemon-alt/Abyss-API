@@ -10,6 +10,8 @@ import youtube from './routes/download-youtube.js';
 import image_edit from './routes/image-edit.js';
 import pinvid from './routes/download-pinvid.js';
 
+import pinvid_dl from './routes/download-pinvid-dl.js';
+
 const port = process.env.PORT || 3000;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,7 +32,7 @@ app.use('/api/tiktok', tiktok);
 app.use('/api/youtube', youtube);
 app.use('/api/nano_banana', image_edit);
 app.use('/api/pin_vid', pinvid);
-
+app.use('/api/pinvid_dl', pinvid_dl);
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
