@@ -12,6 +12,7 @@ import pinvid from './routes/download-pinvid.js';
 
 import pinvid_dl from './routes/download-pinvid-dl.js';
 
+import cat_art.js from './routes/Ai-cat-art.js';
 const port = process.env.PORT || 3000;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +34,7 @@ app.use('/api/youtube', youtube);
 app.use('/api/nano_banana', image_edit);
 app.use('/api/pin_vid', pinvid);
 app.use('/api/pinvid_dl', pinvid_dl);
+app.use('/api/cat_art', cat_art);
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
