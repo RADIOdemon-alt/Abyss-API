@@ -148,23 +148,41 @@ async function searchPinterestVideos(query) {
   }
 }
 
-// 🔹 تحميل الفيديو من Pinterest Downloader
+// 🔹 تحميل الفيديو من Pinterest Downloader (الإصدار المضمون)
 async function pindl(url) {
-  const apiEndpoint =
-    "https://pinterestdownloader.io/frontendService/DownloaderService";
-  const params = { url };
-  const cfg = {
-    params,
-    timeout: 30000,
-    headers: {
-      referer: "https://www.pinterest.com",
-      origin: "https://www.pinterest.com",
-      "user-agent": headers["user-agent"],
-    },
-  };
-  const { data } = await axios.get(apiEndpoint, cfg);
-  if (!data || !data.medias) throw "❌ رد غير صالح من الخادم.";
-  return data;
+  try {
+    const api = "https://pinterestdownloader.io/frontendService/DownloaderService";
+    const response = await axios.post(
+      api,
+      { url },
+      {
+        headers: {
+          "content-type": "application/json",
+          origin: "https://pinterestdownloader.io",
+          referer: "https://pinterestdownloader.io/",
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        },
+        timeout: 20000,
+      }
+    );
+
+    const medias = response?.data?.medias || [];
+    const video = medias.find((m) => m.type === "video") || medias[0];
+
+    if (!video?.url) throw new Error("لم يتم العثور على رابط فيديو صالح");
+
+    return {
+      status: true,
+      title: response.data.title || "بدون عنوان",
+      thumbnail: response.data.thumbnail,
+      duration: response.data.duration || null,
+      video_url: video.url,
+      quality: video.quality || "غير محددة",
+    };
+  } catch (err) {
+    throw new Error("فشل في جلب الفيديو من downloader: " + err.message);
+  }
 }
 
 // 🔸 POST /api/pinterest/videos
@@ -206,7 +224,7 @@ router.get("/", async (req, res) => {
 
   try {
     const info = await pindl(url);
-    res.json({ status: true, info });
+    res.json({ status: true, ...info });
   } catch (e) {
     res.status(500).json({
       status: false,
