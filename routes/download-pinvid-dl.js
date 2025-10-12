@@ -72,7 +72,7 @@ router.get("/", async (req, res) => {
 
   res.json({
     status: true,
-    creator: "Radio Demon",
+    creator: "Dark team",
     message: "📌 استخدم ?url= أو أرسل POST بـ { url: '...' } لتحميل فيديو من Pinterest",
   });
 });
