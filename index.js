@@ -15,7 +15,7 @@ import search_applemusic from './routes/search-applemusic.js';
 import search_tiktok from './routes/search-tiktok.js';
 import download_instagram from './routes/Instagram dl.js';
 import suno_ai from './routes/suno ai.js';
-import ai_music from './routes/ai_music.js';
+import ai_music from './routes/ai-music.js';
 //------------------------------------------------------- 
 const port = process.env.PORT || 3000;
 //------------------------------------------------------
