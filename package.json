@@ -20,6 +20,7 @@
     "node-fetch": "^3.3.2",
     "google-translate-api-x": "*",
     "simple-git": "^3.25.0",
+  "uuid": "^9.0.1",
     "cheerio": "github:AikerDev/cheeiro",
     "discord.js": "^12.5.3",
     "puppeteer": "^23.6.0",
