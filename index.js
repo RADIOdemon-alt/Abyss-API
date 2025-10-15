@@ -16,9 +16,7 @@ import search_tiktok from './routes/search-tiktok.js';
 import download_instagram from './routes/Instagram dl.js';
 import suno_ai from './routes/suno ai.js';
 import ai_music from './routes/ai-music.js';
-//------------------------------------------------------- 
-const port = process.env.PORT || 3000;
-//------------------------------------------------------
+search--------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 //------------------------------------------------------
