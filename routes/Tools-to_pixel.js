@@ -1,39 +1,65 @@
 // file: routes/pixelArt.js
 import express from 'express'
 import axios from 'axios'
+import cheerio from 'cheerio'
 import multer from 'multer'
-import FormData from 'form-data'
-import { fileTypeFromBuffer } from 'file-type'
 
 const router = express.Router()
 const upload = multer()
 
 class PixelArt {
   async img2pixel(buffer, ratio = '1:1') {
-    const { data: a } = await axios.post('https://pixelartgenerator.app/api/upload/presigned-url', {
-      filename: `zenn_${Date.now()}.jpg`,
-      contentType: 'image/jpeg',
-      type: 'pixel-art-source'
-    }, { headers: { 'content-type': 'application/json', referer: 'https://pixelartgenerator.app/' } })
+    const { data: a } = await axios.post(
+      'https://pixelartgenerator.app/api/upload/presigned-url',
+      { filename: `zenn_${Date.now()}.jpg`, contentType: 'image/jpeg', type: 'pixel-art-source' },
+      { headers: { 'content-type': 'application/json', referer: 'https://pixelartgenerator.app/' } }
+    )
 
-    await axios.put(a.data.uploadUrl, buffer, { headers: { 'content-type': 'image/jpeg', 'content-length': buffer.length } })
+    await axios.put(a.data.uploadUrl, buffer, {
+      headers: { 'content-type': 'image/jpeg', 'content-length': buffer.length }
+    })
 
-    const { data: b } = await axios.post('https://pixelartgenerator.app/api/pixel/generate', {
-      imageKey: a.data.key,
-      prompt: '',
-      size: ratio,
-      type: 'image'
-    }, { headers: { 'content-type': 'application/json', referer: 'https://pixelartgenerator.app/' } })
+    const { data: b } = await axios.post(
+      'https://pixelartgenerator.app/api/pixel/generate',
+      { imageKey: a.data.key, prompt: '', size: ratio, type: 'image' },
+      { headers: { 'content-type': 'application/json', referer: 'https://pixelartgenerator.app/' } }
+    )
 
     while (true) {
-      const { data } = await axios.get(`https://pixelartgenerator.app/api/pixel/status?taskId=${b.data.taskId}`, { headers: { 'content-type': 'application/json', referer: 'https://pixelartgenerator.app/' } })
+      const { data } = await axios.get(
+        `https://pixelartgenerator.app/api/pixel/status?taskId=${b.data.taskId}`,
+        { headers: { 'content-type': 'application/json', referer: 'https://pixelartgenerator.app/' } }
+      )
       if (data.data.status === 'SUCCESS') return data.data.images[0]
       await new Promise(r => setTimeout(r, 1000))
     }
   }
 }
 
-// POST /api/pixelart
+// دالة لاستخراج رابط الصورة المباشر من أي صفحة
+async function getDirectImageUrl(url) {
+  try {
+    const res = await axios.get(url)
+    const html = res.data
+    const $ = cheerio.load(html)
+
+    // حاول استخراج صورة من meta property أو من img tag
+    let img = $('meta[property="og:image"]').attr('content') || $('img').first().attr('src')
+    if (!img) throw new Error('لا يمكن استخراج رابط الصورة المباشر')
+    
+    // إذا الرابط نسبي اجعله كامل
+    if (img.startsWith('/')) {
+      const base = new URL(url).origin
+      img = base + img
+    }
+
+    return img
+  } catch (e) {
+    throw new Error('فشل في الحصول على رابط الصورة المباشر: ' + e.message)
+  }
+}
+
+// POST /api/pixelart (رفع ملف من الجهاز)
 router.post('/', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ status: false, message: 'Image file is required' })
@@ -50,13 +76,15 @@ router.post('/', upload.single('image'), async (req, res) => {
   }
 })
 
-// GET /api/pixelart?imageUrl=...
+// GET /api/pixelart?imageUrl=...&ratio=1:1 (من رابط خارجي)
 router.get('/', async (req, res) => {
   try {
     const { imageUrl, ratio = '1:1' } = req.query
     if (!imageUrl) return res.status(400).json({ status: false, message: 'Image URL is required' })
 
-    const imgRes = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+    // الحصول على الرابط المباشر إذا كان صفحة
+    const directUrl = imageUrl.startsWith('http') ? await getDirectImageUrl(imageUrl) : imageUrl
+    const imgRes = await axios.get(directUrl, { responseType: 'arraybuffer' })
     const buffer = Buffer.from(imgRes.data)
 
     const p = new PixelArt()
