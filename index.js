@@ -18,6 +18,7 @@ import suno_ai from './routes/suno ai.js';
 import ai_music from './routes/ai-music.js';
 import gemini from './routes/AI-Gemini.js';
 import deepimg from './routes/Ai-deep_img.js';
+import pixelart from './routes/Tools-to_pixel.js';
 //-------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,6 +48,7 @@ app.use('/api/suno-ai', suno_ai);
 app.use('/api/ai_music', ai_music); 
 app.use('/api/gemini', gemini);
 app.use('/api/deep_img', deepimg);
+app.use('/api/to_pixel', pixelart);
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
