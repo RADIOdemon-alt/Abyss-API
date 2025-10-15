@@ -22,6 +22,7 @@ import deepimg from './routes/Ai-deep_img.js';
 import toanime from './routes/Tools-to_anime.js';
 import elevenlab from './routes/elevenlab.js'; 
 import checkporn from './routes/Tools-check_porn.js';
+import codetest from './routes/Tools-code_test.js';
 //-------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,7 +54,8 @@ app.use('/api/gemini', gemini);
 app.use('/api/deep_img', deepimg);
 app.use('/api/to_anime', toanime);
 app.use('/api/elevenlab', elevenlab); 
-app.use('/api/check_porn', checkporn); 
+app.use('/api/check_porn', checkporn);
+app.use('/api/code_test', codetest); 
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
