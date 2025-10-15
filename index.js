@@ -1,3 +1,4 @@
+// index.js
 import express from 'express';
 import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
@@ -19,12 +20,13 @@ import ai_music from './routes/ai-music.js';
 import gemini from './routes/AI-Gemini.js';
 import deepimg from './routes/Ai-deep_img.js';
 import pixelart from './routes/Tools-to_pixel.js';
-//-------------------------------------------
+import elevenlab from './routes/elevenlab.js'; // 
+//-------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 //------------------------------------------------------
 const app = express();
-const port = process.env.PORT || 3000;  // إضافة البورت
+const port = process.env.PORT || 3000;
 //------------------------------------------------------
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -44,12 +46,13 @@ app.use('/api/cat_art', cat_art);
 app.use('/api/search_applemusic', search_applemusic);
 app.use('/api/search_tiktok', search_tiktok);
 app.use('/api/download_instagram', download_instagram);
-app.use('/api/suno-ai', suno_ai); 
-app.use('/api/ai_music', ai_music); 
+app.use('/api/suno-ai', suno_ai);
+app.use('/api/ai_music', ai_music);
 app.use('/api/gemini', gemini);
 app.use('/api/deep_img', deepimg);
 app.use('/api/to_pixel', pixelart);
+app.use('/api/elevenlab', elevenlab); 
 //------------------------------------------------------
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`✅ Server running on port ${port}`);
 });
