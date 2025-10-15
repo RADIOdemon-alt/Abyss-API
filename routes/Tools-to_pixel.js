@@ -67,9 +67,31 @@ router.post('/', upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ status: false, message: 'Image file is required' })
 
     const p = new PixelArt()
-    const url = await p.img2pixel(req.file.buffer, ratio)
+    const result = await p.img2pixel(req.file.buffer, ratio)
+    const fileRes = await axios.get(result.url, { responseType: 'arraybuffer' })
+    const base64 = `data:${fileRes.headers['content-type']};base64,${Buffer.from(fileRes.data).toString('base64')}`
 
-    res.json({ status: true, url })
+    res.json({ status: true, url: result.url, base64 })
+  } catch (e) {
+    res.status(500).json({ status: false, message: e.message })
+  }
+})
+
+// GET /api/pixelart
+router.get('/', async (req, res) => {
+  try {
+    const { imageUrl, ratio = '1:1' } = req.query
+    if (!imageUrl) return res.status(400).json({ status: false, message: 'Image URL is required' })
+
+    const p = new PixelArt()
+    const imgRes = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+    const buffer = Buffer.from(imgRes.data)
+    const result = await p.img2pixel(buffer, ratio)
+
+    const fileRes = await axios.get(result.url, { responseType: 'arraybuffer' })
+    const base64 = `data:${fileRes.headers['content-type']};base64,${Buffer.from(fileRes.data).toString('base64')}`
+
+    res.json({ status: true, url: result.url, base64 })
   } catch (e) {
     res.status(500).json({ status: false, message: e.message })
   }
