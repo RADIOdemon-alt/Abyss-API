@@ -42,6 +42,7 @@ app.use('/api/search_tiktok', search_tiktok);
 app.use('/api/download_instagram', download_instagram);
 app.use('/api/suno-ai', suno_ai); 
 app.use('/api/ai_music', ai_music); 
+app.use('/api/AI-pollinations',  ai-pollinations); 
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
