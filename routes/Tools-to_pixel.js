@@ -1,7 +1,6 @@
 // file: routes/pixelArt.js
 import express from 'express'
 import axios from 'axios'
-import cheerio from 'cheerio'
 import multer from 'multer'
 
 const router = express.Router()
@@ -36,36 +35,29 @@ class PixelArt {
   }
 }
 
-// دالة لاستخراج رابط الصورة المباشر من أي صفحة
-async function getDirectImageUrl(url) {
-  try {
-    const res = await axios.get(url)
-    const html = res.data
-    const $ = cheerio.load(html)
-
-    // حاول استخراج صورة من meta property أو من img tag
-    let img = $('meta[property="og:image"]').attr('content') || $('img').first().attr('src')
-    if (!img) throw new Error('لا يمكن استخراج رابط الصورة المباشر')
-    
-    // إذا الرابط نسبي اجعله كامل
-    if (img.startsWith('/')) {
-      const base = new URL(url).origin
-      img = base + img
-    }
-
-    return img
-  } catch (e) {
-    throw new Error('فشل في الحصول على رابط الصورة المباشر: ' + e.message)
-  }
+// دالة للتأكد من أن الرابط مباشر
+function isDirectImage(url) {
+  return /\.(jpe?g|png|gif|webp|bmp)$/i.test(url)
 }
 
-// POST /api/pixelart (رفع ملف من الجهاز)
-router.post('/', upload.single('image'), async (req, res) => {
+// GET /api/pixelart?imageUrl=...&ratio=1:1
+router.get('/', async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ status: false, message: 'Image file is required' })
-    const ratio = req.body.ratio || '1:1'
+    let { imageUrl, ratio = '1:1' } = req.query
+    if (!imageUrl) return res.status(400).json({ status: false, message: 'Image URL is required' })
+
+    // إذا الرابط من Quax/Catbox/Imgbb وما هو مباشر، نعيد تحويله مباشرة إلى الرابط المباشر
+    if (!isDirectImage(imageUrl)) {
+      if (imageUrl.includes('qu.ax')) imageUrl = imageUrl.replace('/r', '/files')
+      if (imageUrl.includes('catbox.moe')) imageUrl = imageUrl.replace('/view', '/files')
+      // Imgbb عادة يكون مباشر
+    }
+
+    const imgRes = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+    const buffer = Buffer.from(imgRes.data)
+
     const p = new PixelArt()
-    const result = await p.img2pixel(req.file.buffer, ratio)
+    const result = await p.img2pixel(buffer, ratio)
 
     const fileRes = await axios.get(result.url, { responseType: 'arraybuffer' })
     const base64 = `data:${fileRes.headers['content-type']};base64,${Buffer.from(fileRes.data).toString('base64')}`
@@ -76,19 +68,14 @@ router.post('/', upload.single('image'), async (req, res) => {
   }
 })
 
-// GET /api/pixelart?imageUrl=...&ratio=1:1 (من رابط خارجي)
-router.get('/', async (req, res) => {
+// POST /api/pixelart (رفع ملف من الجهاز)
+router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { imageUrl, ratio = '1:1' } = req.query
-    if (!imageUrl) return res.status(400).json({ status: false, message: 'Image URL is required' })
-
-    // الحصول على الرابط المباشر إذا كان صفحة
-    const directUrl = imageUrl.startsWith('http') ? await getDirectImageUrl(imageUrl) : imageUrl
-    const imgRes = await axios.get(directUrl, { responseType: 'arraybuffer' })
-    const buffer = Buffer.from(imgRes.data)
+    if (!req.file) return res.status(400).json({ status: false, message: 'Image file is required' })
+    const ratio = req.body.ratio || '1:1'
 
     const p = new PixelArt()
-    const result = await p.img2pixel(buffer, ratio)
+    const result = await p.img2pixel(req.file.buffer, ratio)
 
     const fileRes = await axios.get(result.url, { responseType: 'arraybuffer' })
     const base64 = `data:${fileRes.headers['content-type']};base64,${Buffer.from(fileRes.data).toString('base64')}`
