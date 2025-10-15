@@ -16,7 +16,7 @@ import search_tiktok from './routes/search-tiktok.js';
 import download_instagram from './routes/Instagram dl.js';
 import suno_ai from './routes/suno ai.js';
 import ai_music from './routes/ai-music.js';
-import aiPollinations from './routes/AI-pollinations.js';  // تم تعديل الاسم
+import gemini from './routes/AI-Gemini.js';
 //-------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,7 +44,7 @@ app.use('/api/search_tiktok', search_tiktok);
 app.use('/api/download_instagram', download_instagram);
 app.use('/api/suno-ai', suno_ai); 
 app.use('/api/ai_music', ai_music); 
-app.use('/api/AI-pollinations', aiPollinations);
+app.use('/api/AI-gemini', gemini);
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
