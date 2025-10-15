@@ -19,7 +19,7 @@ import suno_ai from './routes/suno ai.js';
 import ai_music from './routes/ai-music.js';
 import gemini from './routes/AI-Gemini.js';
 import deepimg from './routes/Ai-deep_img.js';
-import pixelart from './routes/Tools-to_pixel.js';
+import toanime from './routes/Tools-to_anime.js';
 import elevenlab from './routes/elevenlab.js'; // 
 //-------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -50,7 +50,7 @@ app.use('/api/suno-ai', suno_ai);
 app.use('/api/ai_music', ai_music);
 app.use('/api/gemini', gemini);
 app.use('/api/deep_img', deepimg);
-app.use('/api/to_pixel', pixelart);
+app.use('/api/to_anime', toanime);
 app.use('/api/elevenlab', elevenlab); 
 //------------------------------------------------------
 app.listen(port, () => {
