@@ -16,12 +16,13 @@ import search_tiktok from './routes/search-tiktok.js';
 import download_instagram from './routes/Instagram dl.js';
 import suno_ai from './routes/suno ai.js';
 import ai_music from './routes/ai-music.js';
-import ai-pollinations from './routes/AI-pollinations.js';
+import aiPollinations from './routes/AI-pollinations.js';  // تم تعديل الاسم
 //-------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 //------------------------------------------------------
 const app = express();
+const port = process.env.PORT || 3000;  // إضافة البورت
 //------------------------------------------------------
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -43,7 +44,7 @@ app.use('/api/search_tiktok', search_tiktok);
 app.use('/api/download_instagram', download_instagram);
 app.use('/api/suno-ai', suno_ai); 
 app.use('/api/ai_music', ai_music); 
-app.use('/api/AI-pollinations', ai-pollinations); 
+app.use('/api/AI-pollinations', aiPollinations);
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
