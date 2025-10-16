@@ -23,6 +23,7 @@ import toanime from './routes/Tools-to_anime.js';
 import elevenlab from './routes/elevenlab.js'; 
 import checkporn from './routes/Tools-check_porn.js';
 import codetest from './routes/Tools-code_test.js';
+import anime_voice from './routes/anime-voice.js';
 //-------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +57,7 @@ app.use('/api/to_anime', toanime);
 app.use('/api/elevenlab', elevenlab); 
 app.use('/api/check_porn', checkporn);
 app.use('/api/code_test', codetest); 
+app.use('/api/anime-voice', anime_voice);
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
