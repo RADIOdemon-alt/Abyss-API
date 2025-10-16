@@ -3,26 +3,25 @@ import axios from "axios";
 
 const router = express.Router();
 
-/* 🧩 قائمة الموديلات المدعومة */
+/* قائمة الموديلات */
 const modelsMap = {
-  "img": "flux-1-dev",
-  "realistic": "flux-1-realistic",
-  "fantasy": "flux-1-fantasy",
-  "cyberpunk": "flux-1-cyberpunk",
-  "anime": "flux-1-anime",
-  "cartoon": "flux-1-cartoon",
-  "cinematic": "flux-1-cinematic",
-  "pixels": "flux-1-pixel",
-  "artistic": "flux-1-artistic",
-  "vintage": "flux-1-vintage",
-  "portrait": "flux-1-portrait",
-  "modern": "flux-1-modern",
-  "surreal": "flux-1-surreal",
-  "sketch": "flux-1-sketch",
-  "watercolor": "flux-1-watercolor"
+  "img": "realistic",
+  "realistic": "realistic",
+  "fantasy": "fantasy",
+  "cyberpunk": "cyberpunk",
+  "anime": "anime",
+  "cartoon": "cartoon",
+  "cinematic": "cinematic",
+  "artistic": "artistic",
+  "vintage": "vintage",
+  "portrait": "portrait",
+  "surreal": "surreal",
+  "sketch": "sketch",
+  "watercolor": "watercolor",
+  "pixel": "pixel art"
 };
 
-/* 🌍 الترجمة التلقائية للعربية → الإنجليزية */
+/* دالة الترجمة */
 const translateText = async (text) => {
   try {
     const res = await axios.get(
@@ -34,20 +33,19 @@ const translateText = async (text) => {
   }
 };
 
-/* 🎨 دالة توليد الصورة */
-async function generateImage(prompt, model) {
-  // ترجم النص إذا كان عربيًا
+/* دالة توليد الصورة */
+async function generateImage(prompt, modelStyle) {
+  // ترجمة إذا النص عربي
   if (/[\u0600-\u06FF]/.test(prompt)) {
     prompt = await translateText(prompt);
   }
 
   const deviceId = `dev-${Math.floor(Math.random() * 1000000)}`;
-  const modelName = modelsMap[model] || modelsMap["img"];
 
   const response = await axios.post(
-    `https://api-preview.chatgot.io/api/v1/deepimg/${modelName}`,
+    "https://api-preview.chatgot.io/api/v1/deepimg/flux-1-dev",
     {
-      prompt,
+      prompt: `${prompt} -style ${modelStyle}`,
       size: "1024x1024",
       device_id: deviceId
     },
@@ -68,21 +66,23 @@ async function generateImage(prompt, model) {
   }
 }
 
-/* 🚀 GET Route */
+/* GET */
 router.get("/", async (req, res) => {
   try {
-    const { prompt, model = "img" } = req.query;
+    let { prompt, model = "img" } = req.query;
     if (!prompt)
       return res
         .status(400)
         .json({ status: false, message: "⚠️ النص المطلوب (prompt) مفقود" });
 
-    const imageUrl = await generateImage(prompt, model);
+    const style = modelsMap[model.toLowerCase()] || "realistic";
+    const imageUrl = await generateImage(prompt, style);
 
     res.json({
       status: true,
       message: "✅ تم توليد الصورة بنجاح",
       model,
+      style,
       prompt,
       imageUrl
     });
@@ -98,21 +98,23 @@ router.get("/", async (req, res) => {
   }
 });
 
-/* 🚀 POST Route */
+/* POST */
 router.post("/", async (req, res) => {
   try {
-    const { prompt, model = "img" } = req.body;
+    let { prompt, model = "img" } = req.body;
     if (!prompt)
       return res
         .status(400)
         .json({ status: false, message: "⚠️ النص المطلوب (prompt) مفقود" });
 
-    const imageUrl = await generateImage(prompt, model);
+    const style = modelsMap[model.toLowerCase()] || "realistic";
+    const imageUrl = await generateImage(prompt, style);
 
     res.json({
       status: true,
       message: "✅ تم توليد الصورة بنجاح",
       model,
+      style,
       prompt,
       imageUrl
     });
