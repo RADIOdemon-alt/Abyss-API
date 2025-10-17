@@ -26,7 +26,7 @@ import codetest from './routes/Tools-code_test.js';
 import anime_voice from './routes/anime-voice.js';
 import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
-//-----------
+import spotifydl from './routes/spotifydl.js'; 
 //-------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,6 +63,7 @@ app.use('/api/code_test', codetest);
 app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
+app.use('/api/spotifydl', spotifydl); 
 //------------------------------------------------------
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
