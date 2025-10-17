@@ -1,148 +1,128 @@
-
 import express from "express";
-import fs from "fs/promises";
-import path from "path";
-import { tmpdir } from "os";
-import { fileURLToPath } from "url";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import axios from "axios";
 
 const router = express.Router();
 
-function sanitizeFilename(name = "track") {
-  return name.replace(/[/\\?%*:|"<>]/g, "_").slice(0, 200);
+class SpotifyAPI {
+  constructor() {
+    this.clientId = "cda875b7ec6a4aeea0c8357bfdbab9c2";
+    this.clientSecret = "c2859b35c5164ff7be4f979e19224dbe";
+    this.tokenUrl = "https://accounts.spotify.com/api/token";
+    this.searchUrl = "https://api.spotify.com/v1/search";
+    this.downloadUrl = "https://dark-api-one.vercel.app/api/spotifydl";
+  }
+
+  /** 🪙 الحصول على توكن Spotify */
+  async getToken() {
+    const encoded = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
+    const res = await axios.post(
+      this.tokenUrl,
+      "grant_type=client_credentials",
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${encoded}`,
+        },
+      }
+    );
+    return res.data.access_token;
+  }
+
+  /** 🔍 البحث عن أغنية */
+  async searchTrack(query) {
+    const token = await this.getToken();
+    const res = await axios.get(`${this.searchUrl}?q=${encodeURIComponent(query)}&type=track&limit=1`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const track = res.data.tracks.items[0];
+    if (!track) throw new Error("⚠️ لم يتم العثور على أي نتائج.");
+    return track.external_urls.spotify;
+  }
+
+  /** 🎵 تحميل الأغنية من API خارجي */
+  async downloadTrack(link) {
+    const res = await axios.get(`${this.downloadUrl}?url=${encodeURIComponent(link)}`);
+    return res.data;
+  }
 }
 
-// دالة مساعدة لتحميل الملف مؤقتًا ثم ترسله للعميل
-async function saveTempFile(buffer, filename) {
-  const tmpPath = path.join(tmpdir(), filename);
-  await fs.writeFile(tmpPath, buffer);
-  return tmpPath;
-}
-
+/** 🧩 POST Route */
 router.post("/", async (req, res) => {
   try {
-    const { url } = req.body;
-    if (!url)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ الرابط مطلوب (url)",
-      });
+    const { query } = req.body;
+    if (!query)
+      return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
 
-    const spotModule = await import(path.resolve("./spotisaver.js"));
-    const spot = spotModule.default ?? spotModule;
-    const { getSpotifyInfo, downloadTrack } = spot;
+    const spotify = new SpotifyAPI();
+    let link = query.includes("spotify.com/track")
+      ? query.trim()
+      : await spotify.searchTrack(query);
 
-    if (typeof getSpotifyInfo !== "function" || typeof downloadTrack !== "function") {
-      throw new Error("ملف spotisaver.js لا يُصدّر الدوال المطلوبة (getSpotifyInfo, downloadTrack).");
-    }
+    const data = await spotify.downloadTrack(link);
+    const { status, result, message, error } = data;
 
-    const tracks = await getSpotifyInfo(url);
-    if (!tracks || tracks.length === 0)
-      return res.status(404).json({
-        status: false,
-        message: "⚠️ لم يتم العثور على أي مسار في الرابط المرسل.",
-      });
+    if (!status)
+      return res.status(500).json({ status: false, message: error || message || "❌ فشل التحميل." });
 
-    const isPlaylist = url.includes("/playlist/");
-    const results = [];
-
-    if (!isPlaylist) {
-      const track = Array.isArray(tracks) ? tracks[0] : tracks;
-      const buffer = await downloadTrack(track);
-      if (!buffer || buffer.length === 0) throw new Error("ملف التحميل فارغ");
-
-      const filename = sanitizeFilename(track.name || track.title || "track") + ".mp3";
-      const tmpPath = await saveTempFile(buffer, filename);
-
-      results.push({
-        name: track.name,
-        artists: track.artists,
-        filename,
-        path: tmpPath,
-      });
-
-      return res.json({
-        status: true,
-        message: `✅ تم تحميل المسار: ${track.name}`,
-        track,
-        file: { filename, tmpPath },
-      });
-    } else {
-      const MAX = 5;
-      const toDownload = tracks.slice(0, MAX);
-
-      for (let i = 0; i < toDownload.length; i++) {
-        const t = toDownload[i];
-        try {
-          const buff = await downloadTrack(t);
-          if (!buff || buff.length === 0) throw new Error("ملف فارغ");
-          const fname = sanitizeFilename(t.name || t.title || `track-${i + 1}`) + ".mp3";
-          const tmpP = await saveTempFile(buff, fname);
-          results.push({
-            name: t.name,
-            artists: t.artists,
-            filename: fname,
-            path: tmpP,
-          });
-        } catch (errTrack) {
-          results.push({
-            name: t.name,
-            error: errTrack.message || String(errTrack),
-          });
-        }
-      }
-
-      return res.json({
-        status: true,
-        message: `✅ تم تحميل أول ${results.length} مسارات من قائمة التشغيل.`,
-        count: results.length,
-        results,
-      });
-    }
+    res.json({
+      status: true,
+      message: "✅ تم التحميل بنجاح",
+      result: {
+        title: result.title,
+        artist: result.artist,
+        album: result.album,
+        duration: result.duration,
+        image: result.image,
+        link,
+        download: result.download,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء التعامل مع Spotify",
+      message: "❌ حدث خطأ أثناء معالجة الطلب.",
       error: err.message,
     });
   }
 });
 
+/** 🧩 GET Route */
 router.get("/", async (req, res) => {
   try {
-    const url = req.query.url;
-    if (!url)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ الرابط مطلوب (url)",
-      });
+    const { query } = req.query;
+    if (!query)
+      return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
 
-    const spotModule = await import(path.resolve("./spotisaver.js"));
-    const spot = spotModule.default ?? spotModule;
-    const { getSpotifyInfo } = spot;
+    const spotify = new SpotifyAPI();
+    let link = query.includes("spotify.com/track")
+      ? query.trim()
+      : await spotify.searchTrack(query);
 
-    if (typeof getSpotifyInfo !== "function") {
-      throw new Error("ملف spotisaver.js لا يحتوي على getSpotifyInfo.");
-    }
+    const data = await spotify.downloadTrack(link);
+    const { status, result, message, error } = data;
 
-    const info = await getSpotifyInfo(url);
-    if (!info || info.length === 0)
-      return res.status(404).json({
-        status: false,
-        message: "⚠️ لم يتم العثور على معلومات للمسار المطلوب.",
-      });
+    if (!status)
+      return res.status(500).json({ status: false, message: error || message || "❌ فشل التحميل." });
 
     res.json({
       status: true,
-      message: "✅ تم جلب معلومات المسار بنجاح",
-      results: info,
+      message: "✅ تم التحميل بنجاح",
+      result: {
+        title: result.title,
+        artist: result.artist,
+        album: result.album,
+        duration: result.duration,
+        image: result.image,
+        link,
+        download: result.download,
+      },
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء جلب بيانات Spotify",
+      message: "❌ حدث خطأ أثناء معالجة الطلب.",
       error: err.message,
     });
   }
