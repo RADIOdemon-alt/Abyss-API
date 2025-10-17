@@ -1,3 +1,4 @@
+// routes/spotify.js
 import express from "express";
 import axios from "axios";
 
@@ -15,33 +16,41 @@ class SpotifyAPI {
   /** 🪙 الحصول على توكن Spotify */
   async getToken() {
     const encoded = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
-    const res = await axios.post(
-      this.tokenUrl,
-      "grant_type=client_credentials",
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": `Basic ${encoded}`,
-        },
-      }
-    );
+    const params = new URLSearchParams();
+    params.append("grant_type", "client_credentials");
+
+    const res = await axios.post(this.tokenUrl, params.toString(), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Basic ${encoded}`,
+      },
+    });
+
     return res.data.access_token;
   }
 
   /** 🔍 البحث عن أغنية */
   async searchTrack(query) {
     const token = await this.getToken();
-    const res = await axios.get(`${this.searchUrl}?q=${encodeURIComponent(query)}&type=track&limit=1`, {
+    const res = await axios.get(this.searchUrl, {
+      params: {
+        q: query,
+        type: "track",
+        limit: 1,
+      },
       headers: { Authorization: `Bearer ${token}` },
     });
+
     const track = res.data.tracks.items[0];
     if (!track) throw new Error("⚠️ لم يتم العثور على أي نتائج.");
     return track.external_urls.spotify;
   }
 
   /** 🎵 تحميل الأغنية من API خارجي */
-  async downloadTrack(link) {
-    const res = await axios.get(`${this.downloadUrl}?url=${encodeURIComponent(link)}`);
+  async downloadTrack(queryOrLink) {
+    const res = await axios.get(this.downloadUrl, {
+      params: { query: queryOrLink },
+    });
     return res.data;
   }
 }
@@ -54,11 +63,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
 
     const spotify = new SpotifyAPI();
-    let link = query.includes("spotify.com/track")
-      ? query.trim()
-      : await spotify.searchTrack(query);
-
-    const data = await spotify.downloadTrack(link);
+    const data = await spotify.downloadTrack(query);
     const { status, result, message, error } = data;
 
     if (!status)
@@ -73,7 +78,7 @@ router.post("/", async (req, res) => {
         album: result.album,
         duration: result.duration,
         image: result.image,
-        link,
+        link: result.link,
         download: result.download,
       },
     });
@@ -95,11 +100,7 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
 
     const spotify = new SpotifyAPI();
-    let link = query.includes("spotify.com/track")
-      ? query.trim()
-      : await spotify.searchTrack(query);
-
-    const data = await spotify.downloadTrack(link);
+    const data = await spotify.downloadTrack(query);
     const { status, result, message, error } = data;
 
     if (!status)
@@ -114,7 +115,7 @@ router.get("/", async (req, res) => {
         album: result.album,
         duration: result.duration,
         image: result.image,
-        link,
+        link: result.link,
         download: result.download,
       },
     });
