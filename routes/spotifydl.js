@@ -6,14 +6,31 @@ const router = express.Router();
 
 class SpotifyAPI {
   constructor() {
-    this.clientId = "cda875b7ec6a4aeea0c8357bfdbab9c2";
-    this.clientSecret = "c2859b35c5164ff7be4f979e19224dbe";
+    // أنصح بنقل هذه القيم إلى متغيرات بيئة (process.env)
+    this.clientId = process.env.SPOTIFY_CLIENT_ID || "cda875b7ec6a4aeea0c8357bfdbab9c2";
+    this.clientSecret = process.env.SPOTIFY_CLIENT_SECRET || "c2859b35c5164ff7be4f979e19224dbe";
     this.tokenUrl = "https://accounts.spotify.com/api/token";
-    this.searchUrl = "https://api.spotify.com/v1/search";
-    this.downloadUrl = "https://dark-api-one.vercel.app/api/spotifydl";
+    this.trackUrl = "https://api.spotify.com/v1/tracks";
+    this.downloadUrl = "https://dark-api-one.vercel.app/api/spotifydl"; // واجهة خارجية لتحويل الرابط إلى ملف
+    this.axiosOptions = { timeout: 15000 };
   }
 
-  /** 🪙 الحصول على توكن Spotify */
+  // استخراج معرف الـ track من رابط Spotify
+  extractTrackId(input) {
+    if (!input) return null;
+    const url = input.trim();
+    // رابط web
+    let m = url.match(/open\.spotify\.com\/track\/([A-Za-z0-9]+)/);
+    if (m) return m[1];
+    // URI
+    m = url.match(/spotify:track:([A-Za-z0-9]+)/);
+    if (m) return m[1];
+    // احتمالات أخرى (query param)
+    m = url.match(/track=([A-Za-z0-9]+)/);
+    if (m) return m[1];
+    return null;
+  }
+
   async getToken() {
     const encoded = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
     const params = new URLSearchParams();
@@ -22,109 +39,139 @@ class SpotifyAPI {
     const res = await axios.post(this.tokenUrl, params.toString(), {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": `Basic ${encoded}`,
+        Authorization: `Basic ${encoded}`,
       },
+      ...this.axiosOptions,
     });
-
     return res.data.access_token;
   }
 
-  /** 🔍 البحث عن أغنية */
-  async searchTrack(query) {
+  async fetchTrackMetadata(trackId) {
     const token = await this.getToken();
-    const res = await axios.get(this.searchUrl, {
-      params: {
-        q: query,
-        type: "track",
-        limit: 1,
-      },
+    const res = await axios.get(`${this.trackUrl}/${trackId}`, {
       headers: { Authorization: `Bearer ${token}` },
+      ...this.axiosOptions,
     });
-
-    const track = res.data.tracks.items[0];
-    if (!track) throw new Error("⚠️ لم يتم العثور على أي نتائج.");
-    return track.external_urls.spotify;
+    return res.data; // يحتوي على name, artists, album, images, duration_ms ...
   }
 
-  /** 🎵 تحميل الأغنية من API خارجي */
-  async downloadTrack(queryOrLink) {
+  // طلب الـ downloader الخارجي باستخدام رابط كامل إلى track
+  async downloadTrackByUrl(trackUrl) {
     const res = await axios.get(this.downloadUrl, {
-      params: { query: queryOrLink },
+      params: { url: trackUrl },
+      ...this.axiosOptions,
     });
-    return res.data;
+
+    if (res.status !== 200) {
+      throw new Error(`Downloader returned status ${res.status}`);
+    }
+    const data = res.data;
+    if (!data || data.status !== true) {
+      throw new Error(data?.error || data?.message || "الـ downloader لم يعد بنجاح.");
+    }
+    return data;
   }
 }
 
-/** 🧩 POST Route */
+/** POST */
 router.post("/", async (req, res) => {
   try {
     const { query } = req.body;
-    if (!query)
-      return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
+    if (!query) {
+      return res.status(400).json({ status: false, message: "⚠️ أرسل رابط أغنية Spotify مباشر في الحقل 'query'." });
+    }
 
-    const spotify = new SpotifyAPI();
-    const data = await spotify.downloadTrack(query);
-    const { status, result, message, error } = data;
+    const api = new SpotifyAPI();
+    const trackId = api.extractTrackId(query);
+    if (!trackId) {
+      return res.status(400).json({ status: false, message: "⚠️ الرابط غير صحيح. أرسل رابطًا مثل:\nhttps://open.spotify.com/track/{trackId}" });
+    }
 
-    if (!status)
-      return res.status(500).json({ status: false, message: error || message || "❌ فشل التحميل." });
+    const trackUrl = `https://open.spotify.com/track/${trackId}`;
+
+    // metadata (اختياري — مفيد للرد بالبيانات)
+    let metadata = null;
+    try {
+      metadata = await api.fetchTrackMetadata(trackId);
+    } catch (e) {
+      // لا نفشل العملية بالكامل إن فشل جلب الميتاداتا — لكن نسجل الخطأ
+      console.warn("Failed to fetch Spotify metadata:", e.message);
+    }
+
+    // استدعاء الـ downloader الخارجي
+    const dl = await api.downloadTrackByUrl(trackUrl);
+    const result = dl.result || dl.data || {};
 
     res.json({
       status: true,
-      message: "✅ تم التحميل بنجاح",
+      message: "✅ تم تجهيز بيانات الأغنية بنجاح",
       result: {
-        title: result.title,
-        artist: result.artist,
-        album: result.album,
-        duration: result.duration,
-        image: result.image,
-        link: result.link,
-        download: result.download,
+        title: result.title || metadata?.name || null,
+        artist: result.artist || (metadata?.artists?.map(a => a.name).join(", ") || null),
+        album: result.album || metadata?.album?.name || null,
+        duration: result.duration || metadata?.duration_ms || null,
+        image: result.image || metadata?.album?.images?.[0]?.url || null,
+        link: trackUrl,
+        download: result.download || result.url || null,
+        raw: result,
       },
     });
   } catch (err) {
-    console.error(err);
+    console.error("routes/spotify error:", err);
     res.status(500).json({
       status: false,
       message: "❌ حدث خطأ أثناء معالجة الطلب.",
-      error: err.message,
+      error: err.message || String(err),
     });
   }
 });
 
-/** 🧩 GET Route */
+/** GET */
 router.get("/", async (req, res) => {
   try {
     const { query } = req.query;
-    if (!query)
-      return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
+    if (!query) {
+      return res.status(400).json({ status: false, message: "⚠️ أرسل رابط أغنية Spotify في باراميتر 'query'." });
+    }
 
-    const spotify = new SpotifyAPI();
-    const data = await spotify.downloadTrack(query);
-    const { status, result, message, error } = data;
+    const api = new SpotifyAPI();
+    const trackId = api.extractTrackId(query);
+    if (!trackId) {
+      return res.status(400).json({ status: false, message: "⚠️ الرابط غير صحيح. أرسل رابطًا مثل:\nhttps://open.spotify.com/track/{trackId}" });
+    }
 
-    if (!status)
-      return res.status(500).json({ status: false, message: error || message || "❌ فشل التحميل." });
+    const trackUrl = `https://open.spotify.com/track/${trackId}`;
+
+    let metadata = null;
+    try {
+      metadata = await api.fetchTrackMetadata(trackId);
+    } catch (e) {
+      console.warn("Failed to fetch Spotify metadata:", e.message);
+    }
+
+    const dl = await api.downloadTrackByUrl(trackUrl);
+    const result = dl.result || dl.data || {};
 
     res.json({
       status: true,
-      message: "✅ تم التحميل بنجاح",
+      message: "✅ تم تجهيز بيانات الأغنية بنجاح",
       result: {
-        title: result.title,
-        artist: result.artist,
-        album: result.album,
-        duration: result.duration,
-        image: result.image,
-        link: result.link,
-        download: result.download,
+        title: result.title || metadata?.name || null,
+        artist: result.artist || (metadata?.artists?.map(a => a.name).join(", ") || null),
+        album: result.album || metadata?.album?.name || null,
+        duration: result.duration || metadata?.duration_ms || null,
+        image: result.image || metadata?.album?.images?.[0]?.url || null,
+        link: trackUrl,
+        download: result.download || result.url || null,
+        raw: result,
       },
     });
   } catch (err) {
-    console.error(err);
+    console.error("routes/spotify GET error:", err);
     res.status(500).json({
       status: false,
       message: "❌ حدث خطأ أثناء معالجة الطلب.",
-      error: err.message,
+      error: err.message || String(err),
     });
   }
 });
