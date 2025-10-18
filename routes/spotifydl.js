@@ -1,231 +1,229 @@
 // routes/spotifydl.js
-import express from 'express';
-import axios from 'axios';
+import express from "express";
+import axios from "axios";
 
 const router = express.Router();
 
-/**
- * Helpers
- */
-async function obtenerTokenSpotify() {
-  const clientId = "cda875b7ec6a4aeea0c8357bfdbab9c2";
-  const clientSecret = "c2859b35c5164ff7be4f979e19224dbe";
-  const encoded = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-
-  const res = await axios.post(
-    "https://accounts.spotify.com/api/token",
-    "grant_type=client_credentials",
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${encoded}`
-      }
-    }
-  );
-
-  return res.data.access_token;
-}
-
-function extractId(input) {
-  if (!input) return null;
-  const patterns = [
-    /open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/,
-    /spotify\.com\/track\/([a-zA-Z0-9]{22})/,
-    /spotify:track:([a-zA-Z0-9]{22})/,
-    /^([a-zA-Z0-9]{22})$/
-  ];
-  for (const p of patterns) {
-    const m = input.match(p);
-    if (m) return m[1];
+class SpotifyAPI {
+  constructor() {
+    this.clientId = "cda875b7ec6a4aeea0c8357bfdbab9c2";
+    this.clientSecret = "c2859b35c5164ff7be4f979e19224dbe";
+    this.tokenUrl = "https://accounts.spotify.com/api/token";
+    this.searchUrl = "https://api.spotify.com/v1/search";
+    this.trackUrl = "https://api.spotify.com/v1/tracks";
+    // نستخدم parsevideoapi.videosolo.com فقط
+    this.parseApi = "https://parsevideoapi.videosolo.com/spotify-api/";
+    this._token = null;
+    this._tokenExpiresAt = 0;
   }
-  return null;
-}
 
-/** جلب معلومات المسار من Spotify (يمكن استخدامه في /info) */
-async function spotifyInfo(query) {
-  const token = await obtenerTokenSpotify();
-  const maybeId = extractId(query);
-  if (!maybeId) {
-    // بحث نصي
-    const r = await axios.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const item = r.data.tracks?.items?.[0];
-    if (!item) return null;
-    return {
-      nombre: item.name,
-      artistas: item.artists.map(a => a.name),
-      album: item.album.name,
-      duracion: item.duration_ms,
-      link: item.external_urls?.spotify,
-      id: item.id,
-      image: item.album.images?.[0]?.url
-    };
-  } else {
-    const r = await axios.get(`https://api.spotify.com/v1/tracks/${maybeId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const item = r.data;
-    return {
-      nombre: item.name,
-      artistas: item.artists.map(a => a.name),
-      album: item.album.name,
-      duracion: item.duration_ms,
-      link: item.external_urls?.spotify || `https://open.spotify.com/track/${item.id}`,
-      id: item.id,
-      image: item.album.images?.[0]?.url
-    };
-  }
-}
+  /** احصل على توكن Spotify مع caching بسيط */
+  async getToken() {
+    const now = Date.now();
+    if (this._token && now < this._tokenExpiresAt) return this._token;
 
-/** استدراج رابط التحميل من خدمة خارجية (كما سبق استخدام parsevideoapi.videosolo.com) */
-async function getDownloadMeta(spotifyTrackUrl) {
-  try {
-    const resp = await axios.post(
-      'https://parsevideoapi.videosolo.com/spotify-api/',
-      { format: 'web', url: spotifyTrackUrl },
+    const encoded = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
+    const res = await axios.post(
+      this.tokenUrl,
+      "grant_type=client_credentials",
       {
         headers: {
-          'authority': 'parsevideoapi.videosolo.com',
-          'user-agent': 'Postify/1.0.0',
-          'referer': 'https://spotidown.online/',
-          'origin': 'https://spotidown.online',
-          'content-type': 'application/json'
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${encoded}`,
         },
-        timeout: 20000
+        timeout: 10000,
       }
     );
 
-    const body = resp.data;
-    // هيكل الاستجابة قد يختلف؛ نتحقق بأمان
-    if (!body) return null;
-    if (body.status === "-4") return { error: 'unsupported' };
-    const metadata = body.data?.metadata;
-    if (!metadata) return null;
+    const token = res.data.access_token;
+    const expiresIn = res.data.expires_in || 3600;
+    this._token = token;
+    this._tokenExpiresAt = Date.now() + (expiresIn - 60) * 1000;
+    return token;
+  }
 
-    return {
-      title: metadata.name,
-      artist: metadata.artist,
-      album: metadata.album,
-      duration: metadata.duration,
-      image: metadata.image,
-      download: metadata.download // هذا يجب أن يكون رابط التحميل المباشر
-    };
-  } catch (err) {
-    // لا تُفصح عن كل شيء للعميل؛ فقط ترجع null أو رسالة عامة
+  /** استخراج id من رابط أو من input */
+  static extractId(input) {
+    if (!input) return null;
+    const patterns = [
+      /open\.spotify\.com\/track\/([a-zA-Z0-9]{22})/,
+      /spotify\.com\/track\/([a-zA-Z0-9]{22})/,
+      /spotify:track:([a-zA-Z0-9]{22})/,
+      /^([a-zA-Z0-9]{22})$/
+    ];
+    for (const p of patterns) {
+      const m = input.match(p);
+      if (m) return m[1];
+    }
     return null;
+  }
+
+  /** ابحث عن مسار — أو أعد الرابط لو هو track link / id */
+  async searchTrack(query) {
+    if (!query) throw new Error("No query provided");
+    if (query.includes("spotify.com/track") || SpotifyAPI.extractId(query)) {
+      return query.trim();
+    }
+
+    const token = await this.getToken();
+    const res = await axios.get(`${this.searchUrl}?q=${encodeURIComponent(query)}&type=track&limit=1`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000,
+    });
+
+    const track = res.data.tracks?.items?.[0];
+    if (!track) throw new Error("⚠️ لم يتم العثور على أي نتائج.");
+    return track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`;
+  }
+
+  /**
+   * استخلاص بيانات التحميل من parsevideoapi.videosolo.com
+   * ترجع بنية موحدة: { status: true|false, result?, error? }
+   */
+  async downloadTrack(link) {
+    if (!link) throw new Error("No link provided");
+
+    const maybeId = SpotifyAPI.extractId(link);
+    const fullLink = maybeId ? `https://open.spotify.com/track/${maybeId}` : link;
+
+    try {
+      const resp = await axios.post(
+        this.parseApi,
+        { format: 'web', url: fullLink },
+        {
+          headers: {
+            'authority': 'parsevideoapi.videosolo.com',
+            'user-agent': 'Postify/1.0.0',
+            'referer': 'https://spotidown.online/',
+            'origin': 'https://spotidown.online',
+            'content-type': 'application/json'
+          },
+          timeout: 20000
+        }
+      );
+
+      const body = resp.data;
+      if (!body) {
+        return { status: false, code: 502, error: "فشل في استلام استجابة من خدمة التحويل" };
+      }
+
+      if (body.status === "-4") {
+        return { status: false, code: 400, error: "الرابط غير مدعوم. فقط المسارات (Tracks) مسموحة" };
+      }
+
+      const metadata = body.data?.metadata;
+      if (!metadata) {
+        return { status: false, code: 404, error: "لم يتم العثور على معلومات عن المسار في خدمة التحويل" };
+      }
+
+      if (!metadata.download) {
+        return { status: false, code: 422, error: "الخدمة لم ترجع رابط تحميل مباشر" };
+      }
+
+      return {
+        status: true,
+        code: 200,
+        result: {
+          title: metadata.name,
+          artist: metadata.artist,
+          album: metadata.album,
+          duration: metadata.duration,
+          image: metadata.image,
+          download: metadata.download,
+          trackId: maybeId || metadata.id || null
+        }
+      };
+    } catch (err) {
+      console.error("parsevideoapi error:", err?.message || err);
+      return {
+        status: false,
+        code: err.response?.status || 500,
+        error: "❗ فشل في استخراج رابط التحميل من الخدمة الخارجية"
+      };
+    }
   }
 }
 
-/**
- * Route: GET /
- * - يتوقّع query param: url (رابط سبوتيفاي أو ID)
- * - سيرجع الملف الصوتي مباشرة كـ stream (attachment mp3)
- *
- * مثال:
- * GET /api/spotifydl?url=https://open.spotify.com/track/0b11D9D0hMOYCIMN3OKreM
- */
-router.get('/', async (req, res) => {
+/** POST route */
+router.post("/", async (req, res) => {
   try {
-    const { url } = req.query;
-    if (!url) {
-      return res.status(400).json({
-        success: false,
-        message: '🔴 لازم تدخل رابط سبوتيفاي! مثال: /api/spotifydl?url=https://open.spotify.com/track/0b11D9D0hMOYCIMN3OKreM'
-      });
+    const { query } = req.body;
+    if (!query) return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
+
+    const spotify = new SpotifyAPI();
+    const link = query.includes("spotify.com/track") || SpotifyAPI.extractId(query)
+      ? query.trim()
+      : await spotify.searchTrack(query);
+
+    const data = await spotify.downloadTrack(link);
+    if (!data || data.status !== true) {
+      // إرجاع رسالة موحدة كما طلبت
+      return res.status(502).json({ success: false, message: data?.error || '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
     }
 
-    // أولاً نحصل على معلومات المسار (لتكوين اسم الملف)
-    const info = await spotifyInfo(url);
-    if (!info) {
-      return res.status(404).json({ success: false, message: '⚠️ لم أستطع العثور على معلومات المسار' });
-    }
-
-    // نستخرج رابط التحميل من الخدمة الخارجية
-    const meta = await getDownloadMeta(info.link || `https://open.spotify.com/track/${info.id}`);
-    if (!meta || !meta.download) {
-      return res.status(502).json({ success: false, message: '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
-    }
-
-    // اطلب الملف كـ stream من الرابط الذي أعادته الخدمة الخارجية
-    const audioResp = await axios.get(meta.download, {
-      responseType: 'stream',
-      timeout: 30000,
-      headers: {
-        // بعض الخوادم تطلب user-agent أو referer
-        'User-Agent': 'Mozilla/5.0 (Node.js)'
+    const r = data.result;
+    res.json({
+      status: true,
+      message: "✅ تم التحميل بنجاح",
+      result: {
+        title: r.title,
+        artist: r.artist,
+        album: r.album,
+        duration: r.duration,
+        image: r.image,
+        link,
+        download: r.download,
+        trackId: r.trackId
       }
     });
-
-    // ضع رؤوس الاستجابة بحيث يتم تنزيل الملف أو تشغيله مباشرة
-    const safeTitle = (meta.title || info.nombre || 'unknown').replace(/[\/\\?%*:|"<>]/g, '-');
-    const safeArtist = (meta.artist || (info.artistas || []).join(', ') || 'unknown').replace(/[\/\\?%*:|"<>]/g, '-');
-    const filename = `${safeArtist} - ${safeTitle}.mp3`;
-
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    // يمكنك إضافة طول المحتوى إذا كان مزود الاستجابة يعيده:
-    if (audioResp.headers['content-length']) {
-      res.setHeader('Content-Length', audioResp.headers['content-length']);
-    }
-
-    // قم بتمرير الستريم للعميل
-    audioResp.data.pipe(res);
-
-    // في حال حدوث خطأ أثناء البايب
-    audioResp.data.on('error', err => {
-      console.error('Stream error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ success: false, message: '❗ خطأ أثناء تحميل الملف الصوتي' });
-      } else {
-        res.end();
-      }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء معالجة الطلب.",
+      error: err.message
     });
-
-  } catch (e) {
-    console.error('spotifydl / error:', e?.message || e);
-    if (!res.headersSent) {
-      res.status(500).json({ success: false, message: '❗ خطأ داخلي في السيرفر' });
-    } else {
-      res.end();
-    }
   }
 });
 
-/**
- * Route: GET /info
- * - لإرجاع بيانات المسار و رابط التحميل (JSON) بدون إرسال الصوت.
- * مثال:
- * GET /api/spotifydl/info?url=https://open.spotify.com/track/0b11D9D0hMOYCIMN3OKreM
- */
-router.get('/info', async (req, res) => {
+/** GET route (query param) */
+router.get("/", async (req, res) => {
   try {
-    const { url } = req.query;
-    if (!url) return res.status(400).json({ success: false, message: 'اكتب ?url=' });
+    const { query } = req.query;
+    if (!query) return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
 
-    const info = await spotifyInfo(url);
-    if (!info) return res.status(404).json({ success: false, message: 'لم يتم العثور على المسار' });
+    const spotify = new SpotifyAPI();
+    const link = query.includes("spotify.com/track") || SpotifyAPI.extractId(query)
+      ? query.trim()
+      : await spotify.searchTrack(query);
 
-    const meta = await getDownloadMeta(info.link || `https://open.spotify.com/track/${info.id}`);
-    if (!meta) {
-      return res.status(502).json({ success: false, message: 'فشل استخراج رابط التحميل' });
+    const data = await spotify.downloadTrack(link);
+    if (!data || data.status !== true) {
+      return res.status(502).json({ success: false, message: data?.error || '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
     }
 
+    const r = data.result;
     res.json({
-      success: true,
-      data: {
-        nombre: info.nombre,
-        artistas: info.artistas,
-        album: info.album,
-        duracion: info.duracion,
-        id: info.id,
-        image: info.image,
-        download: meta.download
+      status: true,
+      message: "✅ تم التحميل بنجاح",
+      result: {
+        title: r.title,
+        artist: r.artist,
+        album: r.album,
+        duration: r.duration,
+        image: r.image,
+        link,
+        download: r.download,
+        trackId: r.trackId
       }
     });
-  } catch (e) {
-    console.error('spotifydl/info error:', e);
-    res.status(500).json({ success: false, message: 'خطأ داخلي' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء معالجة الطلب.",
+      error: err.message
+    });
   }
 });
 
