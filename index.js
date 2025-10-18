@@ -46,9 +46,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-app.get('/home', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/page/home/index.html'));
-});c
+
+// 🔹 صفحة الهوم (تلقائي أو يدوي حسب المجلد)
+const homePagePath = path.join(__dirname, 'public', 'page', 'home', 'index.html');
+
+if (fs.existsSync(homePagePath)) {
+  app.get('/home', (req, res) => {
+    res.sendFile(homePagePath);
+  });
+  console.log('✅ صفحة /home متصلة:', homePagePath);
+} else {
+  console.log('❌ صفحة home غير موجودة هنا:', homePagePath);
+}
 //------------------------------------------------------
 // 🔹 توليد تلقائي لمسارات الصفحات داخل public/page/
 const pagesBase = path.join(__dirname, 'public/page');
