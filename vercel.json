@@ -17,7 +17,7 @@
     },
     {
       "src": "/home",
-      "dest": "/public/home/page/index.html"
+      "dest": "/public/page/home/index.html"
     },
     {
       "src": "/api/(.*)",
