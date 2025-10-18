@@ -38,26 +38,30 @@ const port = process.env.PORT || 3000;
 //------------------------------------------------------
 app.use(express.json());
 
-// استخدم public كمسار للملفات الثابتة
+// 🔹 استخدم مجلد public كجذر لكل الملفات الثابتة
 app.use(express.static(path.join(__dirname, 'public')));
 
 //------------------------------------------------------
-// 🔹 صفحة تسجيل الدخول (index.html)
+// 🔹 الصفحة الرئيسية (تسجيل الدخول)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 🔹 قراءة مجلدات الصفحات تلقائيًا (زي /home)
-const pagesDir = path.join(__dirname, 'public');
-const folders = fs.readdirSync(pagesDir).filter(folder =>
-  fs.statSync(path.join(pagesDir, folder)).isDirectory()
-);
+//------------------------------------------------------
+// 🔹 توليد تلقائي لمسارات الصفحات داخل public/page/
+const pagesBase = path.join(__dirname, 'public/page');
 
-folders.forEach(folder => {
-  app.get(`/${folder}`, (req, res) => {
-    res.sendFile(path.join(pagesDir, folder, 'index.html'));
+if (fs.existsSync(pagesBase)) {
+  const pageFolders = fs.readdirSync(pagesBase).filter(folder =>
+    fs.statSync(path.join(pagesBase, folder)).isDirectory()
+  );
+
+  pageFolders.forEach(folder => {
+    app.get(`/${folder}`, (req, res) => {
+      res.sendFile(path.join(pagesBase, folder, 'index.html'));
+    });
   });
-});
+}
 
 //------------------------------------------------------
 // 🔹 كل الـ API routes هنا
@@ -84,7 +88,9 @@ app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotifydl', spotifydl); 
+
 //------------------------------------------------------
+// 🔹 تشغيل السيرفر
 app.listen(port, () => {
   console.log(`✅ Server running on port ${port}`);
 });
