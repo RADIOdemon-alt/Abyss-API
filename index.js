@@ -1,4 +1,4 @@
-// index.js (Protected Version)
+// index.js (Protected Version with .env API Key)
 import express from 'express';
 import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
@@ -37,15 +37,14 @@ import codetest from './routes/Tools-code_test.js';
 import anime_voice from './routes/anime-voice.js';
 import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
-import spotify_dl from './routes/spotify_dl.js'; // ✅ التعديل هنا
+import spotify_dl from './routes/Spotify-dl.js'; 
 //-------------------------------------------------------
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-//------------------------------------------------------
 const app = express();
 const port = process.env.PORT || 3000;
-const API_KEY = process.env.API_KEY || "my-secret-key";
+const API_KEY = process.env.API_KEY || "drk_supersecret123"; // من .env
 
 //------------------------------------------------------
 // 🛡️ إعدادات الحماية العامة
@@ -54,29 +53,22 @@ app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
 
-// 🕒 تحديد عدد الطلبات
+// 🕒 Rate Limit + SlowDown
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100, // 100 طلب في 15 دقيقة
+  max: 100,
   message: { error: '🚫 تم تجاوز الحد المسموح من الطلبات، حاول لاحقًا' }
 });
-app.use('/api', limiter);
+app.use(limiter);
 
-// 🐢 إبطاء الطلبات المكررة (ضد DDoS)
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000,
   delayAfter: 100,
   delayMs: 500
 });
-app.use('/api', speedLimiter);
+app.use(speedLimiter);
 
-// 🔑 تحقق من المفتاح السري للـ API
-app.use('/api', (req, res, next) => {
-  const key = req.query.key || req.headers['x-api-key'];
-  if (key !== API_KEY) return res.status(401).json({ error: '🔑 Invalid API key' });
-  next();
-});
-
+//------------------------------------------------------
 // 🌍 السماح فقط بالـ HTTPS (على سيرفر خارجي)
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
@@ -86,7 +78,7 @@ app.use((req, res, next) => {
 });
 
 //------------------------------------------------------
-// 📁 مجلد الملفات الثابتة
+// 📁 ملفات static مفتوحة لأي زائر
 app.use(express.static(path.join(__dirname, 'public'), {
   dotfiles: 'deny',
   index: false,
@@ -94,7 +86,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 //------------------------------------------------------
-// 🔹 الصفحة الرئيسية
+// 🔹 الصفحة الرئيسية مفتوحة لأي زائر
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -109,7 +101,7 @@ if (fs.existsSync(homePagePath)) {
 }
 
 //------------------------------------------------------
-// 🔹 توليد تلقائي لمسارات الصفحات داخل public/page/
+// 🔹 توليد تلقائي لمسارات الصفحات داخل public/page/ (مفتوحة)
 const pagesBase = path.join(__dirname, 'public/page');
 if (fs.existsSync(pagesBase)) {
   const pageFolders = fs.readdirSync(pagesBase).filter(folder =>
@@ -121,6 +113,16 @@ if (fs.existsSync(pagesBase)) {
     });
   });
 }
+
+//------------------------------------------------------
+// 🔑 حماية كل مسارات /api/* بمفتاح API من .env
+app.use('/api', (req, res, next) => {
+  const key = req.query.key || req.headers['x-api-key'];
+  if (!key || key !== API_KEY) {
+    return res.status(403).json({ error: '⛔️ الوصول مرفوض - مفتاح API غير صالح أو مفقود' });
+  }
+  next();
+});
 
 //------------------------------------------------------
 // 🔹 كل الـ API routes هنا
@@ -146,7 +148,7 @@ app.use('/api/code_test', codetest);
 app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
-app.use('/api/spotify_dl', spotify_dl); // ✅ المسار الصحيح الجديد
+app.use('/api/spotify-dl', spotify_dl); 
 
 //------------------------------------------------------
 // 🚨 التعامل مع الأخطاء العامة
