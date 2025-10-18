@@ -4,20 +4,20 @@ import axios from "axios";
 
 const router = express.Router();
 
-class SpotifyAPI {
+/**
+ * Simple Spotify helper with token caching
+ */
+class SpotifyHelper {
   constructor() {
     this.clientId = "cda875b7ec6a4aeea0c8357bfdbab9c2";
     this.clientSecret = "c2859b35c5164ff7be4f979e19224dbe";
     this.tokenUrl = "https://accounts.spotify.com/api/token";
     this.searchUrl = "https://api.spotify.com/v1/search";
     this.trackUrl = "https://api.spotify.com/v1/tracks";
-    // نستخدم parsevideoapi.videosolo.com فقط
-    this.parseApi = "https://parsevideoapi.videosolo.com/spotify-api/";
     this._token = null;
     this._tokenExpiresAt = 0;
   }
 
-  /** احصل على توكن Spotify مع caching بسيط */
   async getToken() {
     const now = Date.now();
     if (this._token && now < this._tokenExpiresAt) return this._token;
@@ -42,7 +42,6 @@ class SpotifyAPI {
     return token;
   }
 
-  /** استخراج id من رابط أو من input */
   static extractId(input) {
     if (!input) return null;
     const patterns = [
@@ -58,172 +57,272 @@ class SpotifyAPI {
     return null;
   }
 
-  /** ابحث عن مسار — أو أعد الرابط لو هو track link / id */
   async searchTrack(query) {
     if (!query) throw new Error("No query provided");
-    if (query.includes("spotify.com/track") || SpotifyAPI.extractId(query)) {
-      return query.trim();
-    }
-
+    const maybeId = SpotifyHelper.extractId(query);
+    if (maybeId) return `https://open.spotify.com/track/${maybeId}`;
     const token = await this.getToken();
     const res = await axios.get(`${this.searchUrl}?q=${encodeURIComponent(query)}&type=track&limit=1`, {
       headers: { Authorization: `Bearer ${token}` },
       timeout: 10000,
     });
-
     const track = res.data.tracks?.items?.[0];
     if (!track) throw new Error("⚠️ لم يتم العثور على أي نتائج.");
     return track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`;
   }
+}
+
+/**
+ * Main downloader that uses parsevideoapi.videosolo.com as single source
+ */
+class ParseVideoAPI {
+  constructor() {
+    this.endpoint = "https://parsevideoapi.videosolo.com/spotify-api/";
+    this.defaultHeaders = {
+      'authority': 'parsevideoapi.videosolo.com',
+      'user-agent': 'Postify/1.0.0',
+      'referer': 'https://spotidown.online/',
+      'origin': 'https://spotidown.online',
+      'content-type': 'application/json'
+    };
+  }
 
   /**
-   * استخلاص بيانات التحميل من parsevideoapi.videosolo.com
-   * ترجع بنية موحدة: { status: true|false, result?, error? }
+   * Try to extract a valid download link from the service response.
+   * We check multiple common fields to be resilient to API changes.
+   * Returns { ok: true, download, metadata } or { ok: false, error }
    */
-  async downloadTrack(link) {
-    if (!link) throw new Error("No link provided");
-
-    const maybeId = SpotifyAPI.extractId(link);
-    const fullLink = maybeId ? `https://open.spotify.com/track/${maybeId}` : link;
-
+  async fetchMetadata(fullLink) {
     try {
       const resp = await axios.post(
-        this.parseApi,
+        this.endpoint,
         { format: 'web', url: fullLink },
-        {
-          headers: {
-            'authority': 'parsevideoapi.videosolo.com',
-            'user-agent': 'Postify/1.0.0',
-            'referer': 'https://spotidown.online/',
-            'origin': 'https://spotidown.online',
-            'content-type': 'application/json'
-          },
-          timeout: 20000
-        }
+        { headers: this.defaultHeaders, timeout: 25000 }
       );
 
       const body = resp.data;
-      if (!body) {
-        return { status: false, code: 502, error: "فشل في استلام استجابة من خدمة التحويل" };
+      if (!body) return { ok: false, error: "فشل في استلام استجابة من خدمة التحويل" };
+
+      // explicit unsupported status
+      if (body.status === "-4") return { ok: false, error: "الرابط غير مدعوم. فقط المسارات (Tracks) مسموحة" };
+
+      // try common locations for metadata
+      const metadata = body.data?.metadata || body.data || body.result || body.result?.data || null;
+
+      if (!metadata || Object.keys(metadata).length === 0) {
+        return { ok: false, error: "لم يتم العثور على معلومات عن المسار في خدمة التحويل" };
       }
 
-      if (body.status === "-4") {
-        return { status: false, code: 400, error: "الرابط غير مدعوم. فقط المسارات (Tracks) مسموحة" };
+      // possible fields that can contain a download URL
+      const possibleDownloadFields = [
+        'download', 'url', 'src', 'file', 'audio', 'download_url', 'stream', 'play_url'
+      ];
+
+      let download = null;
+      for (const f of possibleDownloadFields) {
+        if (metadata[f]) {
+          download = metadata[f];
+          break;
+        }
       }
 
-      const metadata = body.data?.metadata;
-      if (!metadata) {
-        return { status: false, code: 404, error: "لم يتم العثور على معلومات عن المسار في خدمة التحويل" };
+      // sometimes metadata.download can be an object or array, handle simple cases
+      if (!download && metadata.downloads) {
+        if (Array.isArray(metadata.downloads) && metadata.downloads.length > 0) download = metadata.downloads[0].url || metadata.downloads[0];
+        else if (typeof metadata.downloads === 'object') download = metadata.downloads.url || metadata.downloads[0];
       }
 
-      if (!metadata.download) {
-        return { status: false, code: 422, error: "الخدمة لم ترجع رابط تحميل مباشر" };
+      // if download is a nested object with links
+      if (download && typeof download === 'object') {
+        // try common object shapes
+        download = download.url || download.link || download.src || download[0] || null;
       }
+
+      if (!download) {
+        // as last resort, check top-level body for direct urls
+        const topLevelCandidates = [body.download, body.url, body.data?.url, body.result?.download];
+        for (const cand of topLevelCandidates) {
+          if (cand) {
+            download = cand;
+            break;
+          }
+        }
+      }
+
+      if (!download) {
+        return { ok: false, error: "الخدمة لم تُعد رابط تحميل مباشر" };
+      }
+
+      // Normalize: in some responses download may be an array of mirrors
+      if (Array.isArray(download) && download.length > 0) download = download[0];
 
       return {
-        status: true,
-        code: 200,
-        result: {
-          title: metadata.name,
-          artist: metadata.artist,
-          album: metadata.album,
-          duration: metadata.duration,
-          image: metadata.image,
-          download: metadata.download,
-          trackId: maybeId || metadata.id || null
+        ok: true,
+        download: String(download),
+        metadata: {
+          title: metadata.name || metadata.title || body.title || null,
+          artist: metadata.artist || null,
+          album: metadata.album || null,
+          duration: metadata.duration || null,
+          image: metadata.image || metadata.thumbnail || null,
+          raw: metadata
         }
       };
     } catch (err) {
-      console.error("parsevideoapi error:", err?.message || err);
-      return {
-        status: false,
-        code: err.response?.status || 500,
-        error: "❗ فشل في استخراج رابط التحميل من الخدمة الخارجية"
-      };
+      console.error("parsevideoapi error:", err?.response?.data || err?.message || err);
+      return { ok: false, error: "❗ فشل في استخراج رابط التحميل من الخدمة الخارجية" };
+    }
+  }
+
+  /**
+   * Stream given download URL to the express response.
+   * Handles when the download URL already points to an audio stream.
+   */
+  async streamToClient(downloadUrl, res, filenameHint = null) {
+    try {
+      const audioResp = await axios.get(downloadUrl, {
+        responseType: 'stream',
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Node.js)'
+        }
+      });
+
+      // set headers
+      const contentType = audioResp.headers['content-type'] || 'application/octet-stream';
+      const dispositionName = filenameHint ? filenameHint.replace(/[\/\\?%*:|"<>]/g, '-') : 'track.mp3';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${dispositionName}"`);
+      if (audioResp.headers['content-length']) {
+        res.setHeader('Content-Length', audioResp.headers['content-length']);
+      }
+
+      // pipe stream
+      audioResp.data.pipe(res);
+
+      audioResp.data.on('error', err => {
+        console.error('Stream error:', err);
+        try { if (!res.headersSent) res.status(500).json({ success: false, message: '❗ خطأ أثناء تحميل الملف الصوتي' }); else res.end(); } catch (_) {}
+      });
+    } catch (err) {
+      console.error("Error fetching audio stream:", err?.message || err);
+      if (!res.headersSent) res.status(502).json({ success: false, message: '❗ فشل في تحميل الملف الصوتي من رابط التحميل' });
+      else res.end();
     }
   }
 }
 
-/** POST route */
-router.post("/", async (req, res) => {
+/**
+ * GET /            -> stream audio directly from download (expects ?url=...)
+ * POST /           -> same as GET but accepts JSON body { url: '...' }
+ * GET /info        -> returns metadata + download link (no streaming)
+ */
+
+/** helper to get url from query or body */
+function resolveUrlFromReq(req) {
+  // prefer body.url (POST), then query.url
+  const urlFromBody = req.body?.url || req.body?.query || null;
+  const urlFromQuery = req.query?.url || req.query?.query || null;
+  return urlFromBody || urlFromQuery || null;
+}
+
+/** Stream endpoint */
+router.get("/", async (req, res) => {
   try {
-    const { query } = req.body;
-    if (!query) return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
-
-    const spotify = new SpotifyAPI();
-    const link = query.includes("spotify.com/track") || SpotifyAPI.extractId(query)
-      ? query.trim()
-      : await spotify.searchTrack(query);
-
-    const data = await spotify.downloadTrack(link);
-    if (!data || data.status !== true) {
-      // إرجاع رسالة موحدة كما طلبت
-      return res.status(502).json({ success: false, message: data?.error || '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
+    const input = resolveUrlFromReq(req);
+    if (!input) {
+      return res.status(400).json({ success: false, message: "⚠️ أرسل باراميتر url. مثال: ?url=https://open.spotify.com/track/ID" });
     }
 
-    const r = data.result;
-    res.json({
-      status: true,
-      message: "✅ تم التحميل بنجاح",
-      result: {
-        title: r.title,
-        artist: r.artist,
-        album: r.album,
-        duration: r.duration,
-        image: r.image,
-        link,
-        download: r.download,
-        trackId: r.trackId
-      }
-    });
+    const spotify = new SpotifyHelper();
+    // allow text queries (search) or direct spotify link/id
+    let fullLink;
+    try {
+      fullLink = (input.includes("spotify.com/track") || SpotifyHelper.extractId(input))
+        ? input.trim()
+        : await spotify.searchTrack(input);
+    } catch (err) {
+      // search failed -> assume input was direct url but keep using it
+      fullLink = input.trim();
+    }
+
+    const parser = new ParseVideoAPI();
+    const metaRes = await parser.fetchMetadata(fullLink);
+
+    if (!metaRes.ok) {
+      return res.status(502).json({ success: false, message: metaRes.error || '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
+    }
+
+    // if parse service returned a download link, stream it
+    const downloadUrl = metaRes.download;
+    const title = metaRes.metadata.title || 'track';
+    const artist = metaRes.metadata.artist || 'artist';
+    const filename = `${artist} - ${title}.mp3`.replace(/[\/\\?%*:|"<>]/g, '-');
+
+    // stream to client
+    return parser.streamToClient(downloadUrl, res, filename);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: false,
-      message: "❌ حدث خطأ أثناء معالجة الطلب.",
-      error: err.message
-    });
+    console.error("spotifydl / streaming error:", err?.message || err);
+    if (!res.headersSent) res.status(500).json({ success: false, message: "❗ خطأ داخلي في السيرفر" });
+    else res.end();
   }
 });
 
-/** GET route (query param) */
-router.get("/", async (req, res) => {
+/** allow POST to stream as well (reads body.url) */
+router.post("/", async (req, res) => {
+  // reuse same logic as GET
+  // create a fake req object that merges body into query resolution
+  req.query = req.query || {};
   try {
-    const { query } = req.query;
-    if (!query) return res.status(400).json({ status: false, message: "⚠️ أرسل اسم الأغنية أو رابط Spotify." });
+    // call the same handler by delegating to GET logic
+    return router.handle(req, res);
+  } catch (err) {
+    console.error("spotifydl POST delegation error:", err);
+    if (!res.headersSent) res.status(500).json({ success: false, message: "❗ خطأ داخلي في السيرفر" });
+  }
+});
 
-    const spotify = new SpotifyAPI();
-    const link = query.includes("spotify.com/track") || SpotifyAPI.extractId(query)
-      ? query.trim()
-      : await spotify.searchTrack(query);
+/** Info endpoint: returns metadata + download link (no streaming) */
+router.get("/info", async (req, res) => {
+  try {
+    const input = resolveUrlFromReq(req);
+    if (!input) return res.status(400).json({ success: false, message: "اكتب ?url=" });
 
-    const data = await spotify.downloadTrack(link);
-    if (!data || data.status !== true) {
-      return res.status(502).json({ success: false, message: data?.error || '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
+    const spotify = new SpotifyHelper();
+    let fullLink;
+    try {
+      fullLink = (input.includes("spotify.com/track") || SpotifyHelper.extractId(input))
+        ? input.trim()
+        : await spotify.searchTrack(input);
+    } catch (err) {
+      fullLink = input.trim();
     }
 
-    const r = data.result;
+    const parser = new ParseVideoAPI();
+    const metaRes = await parser.fetchMetadata(fullLink);
+
+    if (!metaRes.ok) {
+      return res.status(502).json({ success: false, message: metaRes.error || '❗ فشل في استخراج رابط التحميل من الخدمة الخارجية' });
+    }
+
+    const md = metaRes.metadata;
     res.json({
-      status: true,
-      message: "✅ تم التحميل بنجاح",
-      result: {
-        title: r.title,
-        artist: r.artist,
-        album: r.album,
-        duration: r.duration,
-        image: r.image,
-        link,
-        download: r.download,
-        trackId: r.trackId
+      success: true,
+      data: {
+        title: md.title || null,
+        artist: md.artist || null,
+        album: md.album || null,
+        duration: md.duration || null,
+        image: md.image || null,
+        download: metaRes.download,
+        raw: md.raw || null
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: false,
-      message: "❌ حدث خطأ أثناء معالجة الطلب.",
-      error: err.message
-    });
+    console.error("spotifydl/info error:", err);
+    res.status(500).json({ success: false, message: "خطأ داخلي" });
   }
 });
 
