@@ -44,7 +44,6 @@ async function spotifyxv(query) {
   const maybeId = extractId(query);
 
   if (maybeId) {
-    // جلب بيانات المسار مباشرة من ID
     const response = await axios.get(
       `https://api.spotify.com/v1/tracks/${maybeId}`,
       {
@@ -59,10 +58,10 @@ async function spotifyxv(query) {
       album: item.album.name,
       duracion: item.duration_ms,
       link: item.external_urls?.spotify || `https://open.spotify.com/track/${item.id}`,
-      id: item.id
+      id: item.id,
+      image: item.album.images[0]?.url
     }];
   } else {
-    // بحث نصي عادي
     const response = await axios.get(
       `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`,
       {
@@ -76,7 +75,8 @@ async function spotifyxv(query) {
       album: item.album.name,
       duracion: item.duration_ms,
       link: item.external_urls.spotify,
-      id: item.id
+      id: item.id,
+      image: item.album.images[0]?.url
     }));
   }
 }
@@ -105,7 +105,8 @@ async function spotiDown(url) {
           'user-agent': 'Postify/1.0.0',
           'referer': 'https://spotidown.online/',
           'origin': 'https://spotidown.online'
-        }
+        },
+        timeout: 15000
       }
     );
 
@@ -156,9 +157,72 @@ async function spotiDown(url) {
   }
 }
 
-// ====== Routes ======
+// ====== الـ Route الرئيسي ======
 
-// Route للبحث عن أغاني Spotify
+// GET /api/spotifydl?url=https://open.spotify.com/track/xxxxx
+router.get('/spotifydl', async (req, res) => {
+  try {
+    const { url } = req.query;
+
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        message: '🔴 لازم تدخل رابط سبوتيفاي!',
+        example: 'GET /api/spotifydl?url=https://open.spotify.com/track/0b11D9D0hMOYCIMN3OKreM'
+      });
+    }
+
+    // استخراج معلومات الأغنية من Spotify
+    const resultados = await spotifyxv(url);
+
+    if (!resultados || resultados.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '⚠️ مع الأسف مش لاقي حاجة تطابق بحثك 😔'
+      });
+    }
+
+    const result = resultados[0];
+    const trackUrl = result.link;
+
+    // تحميل الأغنية
+    const downloadResult = await spotiDown(trackUrl);
+
+    if (!downloadResult.status) {
+      return res.status(downloadResult.code).json({
+        success: false,
+        message: downloadResult.result.error
+      });
+    }
+
+    const { title, artist, album, duration, image, download, trackId } = downloadResult.result;
+
+    // إرجاع البيانات
+    res.json({
+      success: true,
+      data: {
+        title,
+        artist,
+        album,
+        duration,
+        image,
+        downloadUrl: download,
+        trackId,
+        spotifyUrl: `https://open.spotify.com/track/${trackId}`
+      }
+    });
+
+  } catch (error) {
+    console.error('SpotifyDL error:', error);
+    res.status(500).json({
+      success: false,
+      message: '❗ حصل خطأ أثناء معالجة الطلب',
+      error: error.message
+    });
+  }
+});
+
+// Route للبحث - اختياري
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -166,8 +230,8 @@ router.get('/search', async (req, res) => {
     if (!q) {
       return res.status(400).json({
         success: false,
-        message: '🔴 لازم تدخل اسم الفنان أو الأغنية أو رابط سبوتيفاي!',
-        example: 'GET /api/spotify/search?q=insane HAZBIN hotel'
+        message: '🔴 لازم تدخل اسم الأغنية للبحث',
+        example: 'GET /api/search?q=insane HAZBIN hotel'
       });
     }
 
@@ -196,82 +260,19 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Route لتحميل أغنية من Spotify
-router.post('/download', async (req, res) => {
+// Route لتحميل الملف الصوتي مباشرة كـ stream
+router.get('/stream', async (req, res) => {
   try {
-    const { query } = req.body;
+    const { url } = req.query;
 
-    if (!query) {
+    if (!url) {
       return res.status(400).json({
         success: false,
-        message: '🔴 لازم تدخل اسم الفنان أو الأغنية أو رابط سبوتيفاي!',
-        example: 'POST /api/spotify/download with body: { "query": "insane HAZBIN hotel" }'
+        message: '🔴 لازم تدخل رابط سبوتيفاي'
       });
     }
 
-    // البحث عن الأغنية
-    const resultados = await spotifyxv(query);
-
-    if (!resultados || resultados.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '⚠️ مع الأسف مش لاقي حاجة تطابق بحثك 😔'
-      });
-    }
-
-    const result = resultados[0];
-    const trackUrl = result.link;
-
-    // تحميل الأغنية
-    const downloadResult = await spotiDown(trackUrl);
-
-    if (!downloadResult.status) {
-      return res.status(downloadResult.code).json({
-        success: false,
-        message: downloadResult.result.error
-      });
-    }
-
-    const { title, artist, album, duration, image, download, trackId } = downloadResult.result;
-
-    res.json({
-      success: true,
-      track: {
-        title,
-        artist,
-        album,
-        duration,
-        image,
-        downloadUrl: download,
-        trackId,
-        spotifyUrl: `https://open.spotify.com/track/${trackId}`
-      }
-    });
-
-  } catch (error) {
-    console.error('Download error:', error);
-    res.status(500).json({
-      success: false,
-      message: '❗ حصل خطأ أثناء التحميل',
-      error: error.message
-    });
-  }
-});
-
-// Route لتحميل الملف الصوتي مباشرة
-router.get('/stream/:trackId', async (req, res) => {
-  try {
-    const { trackId } = req.params;
-
-    if (!trackId) {
-      return res.status(400).json({
-        success: false,
-        message: '🔴 لازم تدخل Track ID'
-      });
-    }
-
-    const trackUrl = `https://open.spotify.com/track/${trackId}`;
-    const downloadResult = await spotiDown(trackUrl);
+    const downloadResult = await spotiDown(url);
 
     if (!downloadResult.status) {
       return res.status(downloadResult.code).json({
@@ -284,68 +285,22 @@ router.get('/stream/:trackId', async (req, res) => {
 
     // تحميل الملف الصوتي
     const audioRes = await axios.get(download, { 
-      responseType: 'arraybuffer' 
+      responseType: 'stream' 
     });
 
-    // إرسال الملف الصوتي
+    // إرسال الملف الصوتي كـ stream
     res.set({
-      'Content-Type': 'audio/mp4',
+      'Content-Type': 'audio/mpeg',
       'Content-Disposition': `attachment; filename="${artist} - ${title}.mp3"`
     });
 
-    res.send(Buffer.from(audioRes.data));
+    audioRes.data.pipe(res);
 
   } catch (error) {
     console.error('Stream error:', error);
     res.status(500).json({
       success: false,
       message: '❗ حصل خطأ أثناء تحميل الملف',
-      error: error.message
-    });
-  }
-});
-
-// Route للحصول على معلومات Track محدد
-router.get('/track/:trackId', async (req, res) => {
-  try {
-    const { trackId } = req.params;
-
-    if (!trackId) {
-      return res.status(400).json({
-        success: false,
-        message: '🔴 لازم تدخل Track ID'
-      });
-    }
-
-    const token = await obtenerTokenSpotify();
-    const response = await axios.get(
-      `https://api.spotify.com/v1/tracks/${trackId}`,
-      {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }
-    );
-
-    const item = response.data;
-
-    res.json({
-      success: true,
-      track: {
-        id: item.id,
-        name: item.name,
-        artists: item.artists.map(a => a.name),
-        album: item.album.name,
-        duration: item.duration_ms,
-        image: item.album.images[0]?.url,
-        spotifyUrl: item.external_urls.spotify,
-        previewUrl: item.preview_url
-      }
-    });
-
-  } catch (error) {
-    console.error('Track info error:', error);
-    res.status(500).json({
-      success: false,
-      message: '❗ حصل خطأ أثناء جلب معلومات المسار',
       error: error.message
     });
   }
