@@ -3,6 +3,8 @@ import express from 'express';
 import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
+
 //-------------------------------------------------------
 import tools_tr from './routes/tools-tr.js';
 import pinterest from './routes/download-pinterest.js';
@@ -35,12 +37,30 @@ const app = express();
 const port = process.env.PORT || 3000;
 //------------------------------------------------------
 app.use(express.json());
-app.use(express.static(__dirname));
+
+// استخدم public كمسار للملفات الثابتة
+app.use(express.static(path.join(__dirname, 'public')));
+
 //------------------------------------------------------
+// 🔹 صفحة تسجيل الدخول (index.html)
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/index.html');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// 🔹 قراءة مجلدات الصفحات تلقائيًا (زي /home)
+const pagesDir = path.join(__dirname, 'public');
+const folders = fs.readdirSync(pagesDir).filter(folder =>
+  fs.statSync(path.join(pagesDir, folder)).isDirectory()
+);
+
+folders.forEach(folder => {
+  app.get(`/${folder}`, (req, res) => {
+    res.sendFile(path.join(pagesDir, folder, 'index.html'));
+  });
+});
+
 //------------------------------------------------------
+// 🔹 كل الـ API routes هنا
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
