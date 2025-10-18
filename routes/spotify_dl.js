@@ -1,122 +1,163 @@
 import express from "express";
 import axios from "axios";
-import fs from "fs";
-import path from "path";
 
 const router = express.Router();
 
-const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36"
-};
-
-function parseSpotifyUrl(input) {
-  let url = input.trim();
-
-  if (url.includes("spotify.link")) {
-    throw new Error("⚠️ الروابط المختصرة (spotify.link) غير مدعومة. استخدم open.spotify.com");
+class SpotifyDL {
+  constructor() {
+    this.base = "https://spotisaver.net";
+    this.headers = {
+      "User-Agent":
+        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+      Accept: "application/json",
+    };
   }
 
-  const trackMatch = url.match(/\/track\/([a-zA-Z0-9]+)/);
-  if (trackMatch) return { id: trackMatch[1], type: "track", referer: `https://spotisaver.net/en/track/${trackMatch[1]}/` };
+  parseUrl(url) {
+    if (!url.includes("spotify.com")) throw new Error("❌ رابط Spotify غير صالح");
+    if (url.includes("spotify.link"))
+      throw new Error("⚠️ الروابط المختصرة (spotify.link) غير مدعومة");
 
-  const playlistMatch = url.match(/\/playlist\/([a-zA-Z0-9]+)/);
-  if (playlistMatch) return { id: playlistMatch[1], type: "playlist", referer: `https://spotisaver.net/en/playlist/${playlistMatch[1]}/` };
+    const track = url.match(/\/track\/([a-zA-Z0-9]+)/);
+    const playlist = url.match(/\/playlist\/([a-zA-Z0-9]+)/);
+    const album = url.match(/\/album\/([a-zA-Z0-9]+)/);
 
-  const albumMatch = url.match(/\/album\/([a-zA-Z0-9]+)/);
-  if (albumMatch) return { id: albumMatch[1], type: "playlist", referer: `https://spotisaver.net/en/playlist/${albumMatch[1]}/` };
+    if (track)
+      return {
+        id: track[1],
+        type: "track",
+        referer: `${this.base}/en/track/${track[1]}/`,
+      };
+    if (playlist)
+      return {
+        id: playlist[1],
+        type: "playlist",
+        referer: `${this.base}/en/playlist/${playlist[1]}/`,
+      };
+    if (album)
+      return {
+        id: album[1],
+        type: "playlist",
+        referer: `${this.base}/en/playlist/${album[1]}/`,
+      };
 
-  throw new Error("❌ رابط Spotify غير صالح! استخدم روابط track أو playlist أو album.");
-}
-
-async function getSpotifyInfo(url) {
-  const { id, type, referer } = parseSpotifyUrl(url);
-  const apiUrl = `https://spotisaver.net/api/get_playlist.php?id=${id}&type=${type}&lang=en`;
-
-  const res = await axios.get(apiUrl, {
-    headers: { ...HEADERS, Referer: referer, Accept: "application/json" },
-    timeout: 20000
-  });
-
-  if (!res.data?.tracks || res.data.tracks.length === 0) {
-    throw new Error("❌ لم يتم العثور على مسارات في الرابط!");
+    throw new Error("⚠️ استخدم رابط track أو playlist أو album فقط.");
   }
 
-  return { tracks: res.data.tracks, type, id };
+  async getInfo(url) {
+    const { id, type, referer } = this.parseUrl(url);
+    const api = `${this.base}/api/get_playlist.php?id=${id}&type=${type}&lang=en`;
+
+    const res = await axios.get(api, {
+      headers: { ...this.headers, Referer: referer },
+      timeout: 15000,
+    });
+
+    if (!res.data?.tracks?.length) throw new Error("❌ لم يتم العثور على أي مسارات!");
+    return { tracks: res.data.tracks, id, type };
+  }
+
+  async downloadTrack(track) {
+    const payload = {
+      track,
+      download_dir: "downloads",
+      filename_tag: "SPOTISAVER",
+      user_ip: "2404:c0:9830::800e:2a9c",
+      is_premium: false,
+    };
+
+    const res = await axios.post(`${this.base}/api/download_track.php`, payload, {
+      headers: {
+        ...this.headers,
+        Referer: `${this.base}/en/track/${track.id}/`,
+        "Content-Type": "application/json",
+      },
+      timeout: 60000,
+      responseType: "arraybuffer",
+    });
+
+    if (!res.data || res.data.length === 0)
+      throw new Error("⚠️ فشل في تحميل الصوت من المصدر.");
+    return res.data;
+  }
 }
 
-async function downloadTrack(track) {
-  const payload = {
-    track,
-    download_dir: "downloads",
-    filename_tag: "SPOTISAVER",
-    user_ip: "2404:c0:9830::800e:2a9c",
-    is_premium: false
-  };
-
-  const res = await axios.post("https://spotisaver.net/api/download_track.php", payload, {
-    headers: { ...HEADERS, Referer: `https://spotisaver.net/en/track/${track.id}/`, "Content-Type": "application/json" },
-    responseType: "arraybuffer",
-    timeout: 60000
-  });
-
-  return Buffer.from(res.data);
-}
-
-function cleanFileName(name = "track") {
-  return name.replace(/[\\/:"'*?<>|]+/g, "").replace(/\s+/g, "_").slice(0, 150);
-}
-
-//==========================================================
-// 📡 Route: /api/Spotify-dl?url=<spotify_link>&index=<num>
-//==========================================================
-router.get("/", async (req, res) => {
-  const { url, index } = req.query;
-
+/** 🎧 POST Route */
+router.post("/", async (req, res) => {
   try {
-    if (!url) {
-      return res.status(400).json({
-        error: "⚠️ يرجى إدخال رابط Spotify\nمثال: /api/Spotify-dl?url=https://open.spotify.com/track/xxxxx"
+    const { url, index = 1 } = req.body;
+    if (!url)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ أدخل رابط Spotify في body (url)" });
+
+    const spotify = new SpotifyDL();
+    const { tracks, type } = await spotify.getInfo(url);
+    const i = parseInt(index) - 1;
+
+    if (type === "playlist" && (i < 0 || i >= tracks.length))
+      return res.json({
+        status: false,
+        message: `⚠️ رقم غير صالح! اختر رقم بين 1 و ${tracks.length}`,
       });
-    }
 
-    console.log("🎵 معالجة Spotify:", url);
-    const { tracks, type } = await getSpotifyInfo(url);
-    const trackIndex = index ? parseInt(index) - 1 : 0;
-
-    if (type === "playlist" && (trackIndex < 0 || trackIndex >= tracks.length)) {
-      return res.status(400).json({
-        error: `⚠️ رقم المسار غير صالح! اختر رقم بين 1 و ${tracks.length}`
-      });
-    }
-
-    const track = tracks[trackIndex];
-    const fileBuffer = await downloadTrack(track);
-
-    if (!fileBuffer || fileBuffer.length === 0) {
-      throw new Error("⚠️ تم تنزيل ملف فارغ - قد يكون هناك مشكلة في المسار.");
-    }
-
-    const fileName = `${cleanFileName(track.name || `track-${track.id}`)}.mp3`;
-    const tempPath = path.join(process.cwd(), `temp_${Date.now()}.mp3`);
-    fs.writeFileSync(tempPath, fileBuffer);
+    const track = tracks[i];
+    const file = await spotify.downloadTrack(track);
 
     res.set({
-      "Content-Disposition": `attachment; filename="${fileName}"`,
-      "Content-Type": "audio/mpeg"
+      "Content-Type": "audio/mpeg",
+      "Content-Disposition": `attachment; filename="${track.name
+        .replace(/[\\/:*?"<>|]/g, "")
+        .slice(0, 100)}.mp3"`,
     });
 
-    const stream = fs.createReadStream(tempPath);
-    stream.pipe(res);
-    stream.on("close", () => {
-      fs.unlinkSync(tempPath);
-      console.log("🗑️ حذف الملف المؤقت:", fileName);
-    });
-
+    res.send(Buffer.from(file));
   } catch (err) {
-    console.error("❌ Spotify-dl Error:", err.message);
+    console.error("❌ Spotify Error:", err.message);
     res.status(500).json({
-      error: "حدث خطأ أثناء معالجة رابط Spotify",
-      details: err.message
+      status: false,
+      message: "❌ فشل تحميل الصوت من Spotify",
+      error: err.message,
+    });
+  }
+});
+
+/** 🎧 GET Route */
+router.get("/", async (req, res) => {
+  try {
+    const { url, index = 1 } = req.query;
+    if (!url)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ أدخل رابط Spotify في ?url=" });
+
+    const spotify = new SpotifyDL();
+    const { tracks, type } = await spotify.getInfo(url);
+    const i = parseInt(index) - 1;
+
+    if (type === "playlist" && (i < 0 || i >= tracks.length))
+      return res.json({
+        status: false,
+        message: `⚠️ رقم غير صالح! اختر رقم بين 1 و ${tracks.length}`,
+      });
+
+    const track = tracks[i];
+    const file = await spotify.downloadTrack(track);
+
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Content-Disposition": `attachment; filename="${track.name
+        .replace(/[\\/:*?"<>|]/g, "")
+        .slice(0, 100)}.mp3"`,
+    });
+
+    res.send(Buffer.from(file));
+  } catch (err) {
+    console.error("❌ Spotify Error:", err.message);
+    res.status(500).json({
+      status: false,
+      message: "❌ فشل تحميل الصوت من Spotify",
+      error: err.message,
     });
   }
 });
