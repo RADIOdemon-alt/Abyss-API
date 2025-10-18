@@ -148,7 +148,7 @@ app.use('/api/code_test', codetest);
 app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
-app.use('/api/spotify-dl', spotify_dl); 
+app.use('/api/spotify_dl', spotify_dl); 
 
 //------------------------------------------------------
 // 🚨 التعامل مع الأخطاء العامة
