@@ -37,7 +37,7 @@ import codetest from './routes/Tools-code_test.js';
 import anime_voice from './routes/anime-voice.js';
 import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
-import spotifydl from './routes/spotifydl.js'; 
+import Spotify-dl from './routes/Spotify-dl.js'; 
 //-------------------------------------------------------
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -146,7 +146,7 @@ app.use('/api/code_test', codetest);
 app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
-app.use('/api/spotifydl', spotifydl); 
+app.use('/api/Spotify-dl', Spotify-dl); 
 
 //------------------------------------------------------
 // 🚨 التعامل مع الأخطاء العامة
