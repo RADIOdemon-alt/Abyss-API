@@ -9,8 +9,8 @@ import xssClean from 'xss-clean';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
-
 // 🧩 API Routes
+import firebaseRoute from './routes/firebase.js';
 import tools_tr from './routes/tools-tr.js';
 import pinterest from './routes/download-pinterest.js';
 import tiktok from './routes/download-tiktok.js';
@@ -93,7 +93,7 @@ app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
-
+app.use('/api/firebase', firebaseRoute);
 //------------------------------------------------------
 // 🧭 التعامل مع الصفحات
 app.get('/:page?', (req, res, next) => {
