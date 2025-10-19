@@ -10,10 +10,6 @@
     {
       "src": "/(.*)",
       "dest": "/index.js"
-    },
-    {
-      "src": "/home(.*)",
-      "dest": "/page/home/index.js"
     }
   ]
 }
