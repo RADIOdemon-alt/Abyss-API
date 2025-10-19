@@ -9,6 +9,7 @@ import xssClean from 'xss-clean';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
+import dotenv from 'dotenv';
 // 🧩 API Routes
 import firebaseRoute from './routes/firebase.js';
 import tools_tr from './routes/tools-tr.js';
@@ -70,6 +71,8 @@ app.use(express.static(publicDir, { extensions: ['html', 'htm'] }));
 
 //------------------------------------------------------
 // 🔹 API routes
+dotenv.config(); // لازم يكون قبل أي استيراد للـ routes أو Firebase
+
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
