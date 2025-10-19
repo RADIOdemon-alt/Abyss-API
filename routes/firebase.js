@@ -6,10 +6,12 @@ import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 const router = express.Router();
 
-// Middleware للتحقق من API Key
+// Middleware للتحقق من API Key ثابت
+const MY_API_KEY = "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa"; // حط هنا مفتاحك الثابت
+
 router.use((req, res, next) => {
   const apiKey = req.headers['x-api-key'];
-  if (!apiKey || apiKey !== process.env.API_KEY) {
+  if (!apiKey || apiKey !== MY_API_KEY) {
     return res.status(403).json({ success: false, message: "❌ API Key غير صحيح" });
   }
   next();
