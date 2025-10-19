@@ -1,4 +1,4 @@
-// index.js (Full Auto Multi-Page + API Server)
+// index.js (Full Auto Multi-Page + API Server + Auth System)
 import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -9,6 +9,9 @@ import xssClean from 'xss-clean';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
+import cors from 'cors';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // 🧩 API Routes
 import tools_tr from './routes/tools-tr.js';
@@ -35,17 +38,30 @@ import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
 import spotify_dl from './routes/Spotify_dl.js';
 
+// 🧩 Firebase Imports (Backend Only)
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
+
+//------------------------------------------------------
+// 📍 التهيئة العامة
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
+
 //------------------------------------------------------
-// ⚙️ إعداد Body Parser لقراءة البيانات من POST و JSON
+// ⚙️ إعداد Body Parser و CORS
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 //------------------------------------------------------
-// 🛡️ إعدادات الأمان العامة
+// 🛡️ إعدادات الأمان
 app.use(helmet());
 app.use(compression());
 app.use(xssClean());
@@ -54,7 +70,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 
 //------------------------------------------------------
-// 🌍 السماح بالـ HTTPS فقط (اختياري)
+// 🌍 السماح فقط بـ HTTPS
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
     return res.redirect('https://' + req.headers.host + req.url);
@@ -63,41 +79,31 @@ app.use((req, res, next) => {
 });
 
 //------------------------------------------------------
-// 📂 ملفات static لأي نوع (html / css / js / img)
+// 📂 ملفات static (frontend)
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir, { extensions: ['html', 'htm'] }));
 
 //------------------------------------------------------
-// 🧭 التعامل مع الصفحات الفرعية مثل /home → public/home/index.html
+// 🧭 الصفحات
 app.get('/:page?', (req, res) => {
   const page = req.params.page || 'index';
   const folderPath = path.join(publicDir, page);
   const indexPath = path.join(folderPath, 'index.html');
   const rootIndex = path.join(publicDir, 'index.html');
 
-  // ✅ لو الصفحة موجودة (مجلد + index.html)
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
-  }
-
-  // ✅ لو الصفحة الرئيسية
-  if (page === 'index' && fs.existsSync(rootIndex)) {
-    return res.sendFile(rootIndex);
-  }
-
-  // 🧩 فهرس المجلد (للتطوير فقط)
+  if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+  if (page === 'index' && fs.existsSync(rootIndex)) return res.sendFile(rootIndex);
   if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
     const files = fs.readdirSync(folderPath);
     const list = files.map(f => `<li><a href="/${page}/${f}">${f}</a></li>`).join('');
     return res.send(`<h2>📂 محتويات المجلد /${page}</h2><ul>${list}</ul>`);
   }
 
-  // 🚫 الصفحة غير موجودة
   return res.status(404).send('404 - الصفحة غير موجودة 🚫');
 });
 
 //------------------------------------------------------
-// 🔹 كل الـ API routes (بدون vercel.json)
+// 🔹 كل الـ API routes
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -123,14 +129,68 @@ app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
 
 //------------------------------------------------------
-// 🚨 التعامل مع الأخطاء العامة
+// 🔐 Firebase Auth API (Backend Only)
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
+function generateId() {
+  return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+}
+
+// تسجيل مستخدم جديد
+app.post('/api/register', async (req, res) => {
+  const { name, phone, email, password, country } = req.body;
+
+  try {
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCred.user;
+    await setDoc(doc(db, 'users', user.uid), {
+      id: generateId(),
+      name,
+      phone,
+      email,
+      country,
+      role: 'user',
+    });
+    res.json({ success: true, message: 'تم التسجيل بنجاح ✅' });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// تسجيل الدخول
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    res.json({ success: true, message: 'تم تسجيل الدخول بنجاح ✅' });
+  } catch (err) {
+    res.status(400).json({ success: false, message: 'البريد أو كلمة السر غير صحيحة ❌' });
+  }
+});
+
+//------------------------------------------------------
+// 🚨 الأخطاء العامة
 app.use((err, req, res, next) => {
   console.error('❌ Internal Error:', err.stack);
   res.status(500).json({ error: '🔥 Internal Server Error' });
 });
 
 //------------------------------------------------------
-// 🚀 تشغيل السيرفر
+// 🚀 التشغيل
 app.listen(port, () => {
   console.log(`✅ Server running perfectly on http://localhost:${port}`);
 });
