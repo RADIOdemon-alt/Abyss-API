@@ -39,13 +39,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
+
 //------------------------------------------------------
-// ⚙️ إعداد Body Parser لقراءة البيانات من POST و JSON
+// ⚙️ إعداد Body Parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 //------------------------------------------------------
-// 🛡️ إعدادات الأمان العامة
+// 🛡️ إعدادات الأمان
 app.use(helmet());
 app.use(compression());
 app.use(xssClean());
@@ -56,48 +57,53 @@ app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 //------------------------------------------------------
 // 🌍 السماح بالـ HTTPS فقط (اختياري)
 app.use((req, res, next) => {
-if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
-return res.redirect('https://' + req.headers.host + req.url);
-}
-next();
+  if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect('https://' + req.headers.host + req.url);
+  }
+  next();
 });
 
 //------------------------------------------------------
-// 📂 ملفات static لأي نوع (html / css / js / img)
+// 📂 ملفات static
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir, { extensions: ['html', 'htm'] }));
 
 //------------------------------------------------------
-// 🧭 التعامل مع الصفحات الفرعية مثل /home → public/home/index.html
+// 🧭 التعامل مع الصفحات الفرعية
 app.get('/:page?', (req, res) => {
-const page = req.params.page || 'index';
-const folderPath = path.join(publicDir, page);
-const indexPath = path.join(folderPath, 'index.html');
-const rootIndex = path.join(publicDir, 'index.html');
+  const page = req.params.page || 'index';
+  const folderPath = path.join(publicDir, page);
+  const indexPath = path.join(folderPath, 'index.html');
+  const rootIndex = path.join(publicDir, 'index.html');
+  const notFoundPage = path.join(publicDir, '404.html');
 
-// ✅ لو الصفحة موجودة (مجلد + index.html)
-if (fs.existsSync(indexPath)) {
-return res.sendFile(indexPath);
-}
+  // ✅ لو الصفحة موجودة
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
 
-// ✅ لو الصفحة الرئيسية
-if (page === 'index' && fs.existsSync(rootIndex)) {
-return res.sendFile(rootIndex);
-}
+  // ✅ الصفحة الرئيسية
+  if (page === 'index' && fs.existsSync(rootIndex)) {
+    return res.sendFile(rootIndex);
+  }
 
-// 🧩 فهرس المجلد (للتطوير فقط)
-if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
-const files = fs.readdirSync(folderPath);
-const list = files.map(f => <li><a href="/${page}/${f}">${f}</a></li>).join('');
-return res.send(<h2>📂 محتويات المجلد /${page}</h2><ul>${list}</ul>);
-}
+  // 🧩 فهرس المجلد (للتطوير فقط)
+  if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+    const files = fs.readdirSync(folderPath);
+    const list = files.map(f => `<li><a href="/${page}/${f}">${f}</a></li>`).join('');
+    return res.send(`<h2>📂 محتويات المجلد /${page}</h2><ul>${list}</ul>`);
+  }
 
-// 🚫 الصفحة غير موجودة
-return res.status(404).send('404 - الصفحة غير موجودة 🚫');
+  // 🚫 الصفحة غير موجودة
+  if (fs.existsSync(notFoundPage)) {
+    return res.status(404).sendFile(notFoundPage);
+  } else {
+    return res.status(404).send('404 - الصفحة غير موجودة 🚫');
+  }
 });
 
 //------------------------------------------------------
-// 🔹 كل الـ API routes (بدون vercel.json)
+// 🔹 API routes
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -125,13 +131,12 @@ app.use('/api/spotify_dl', spotify_dl);
 //------------------------------------------------------
 // 🚨 التعامل مع الأخطاء العامة
 app.use((err, req, res, next) => {
-console.error('❌ Internal Error:', err.stack);
-res.status(500).json({ error: '🔥 Internal Server Error' });
+  console.error('❌ Internal Error:', err.stack);
+  res.status(500).json({ error: '🔥 Internal Server Error' });
 });
 
 //------------------------------------------------------
 // 🚀 تشغيل السيرفر
 app.listen(port, () => {
-console.log(✅ Server running perfectly on http://localhost:${port});
+  console.log(`✅ Server running perfectly on http://localhost:${port}`);
 });
-
