@@ -39,6 +39,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
+//------------------------------------------------------
+// ⚙️ إعداد Body Parser لقراءة البيانات من POST و JSON
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 //------------------------------------------------------
 // 🛡️ إعدادات الأمان العامة
