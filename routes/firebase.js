@@ -16,15 +16,17 @@ router.use((req, res, next) => {
 });
 
 // إعدادات Firebase من .env
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
-  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
-};
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyAb12YNs0qOVF8dWoPJK0jG7mUG-zk-K7w",
+    authDomain: "dark-api-f4ec2.firebaseapp.com",
+    projectId: "dark-api-f4ec2",
+    storageBucket: "dark-api-f4ec2.firebasestorage.app",
+    messagingSenderId: "859798996765",
+    appId: "1:859798996765:web:c80a13987f0caae69283f4",
+    measurementId: "G-NHEWELXPQY"
+  };
 
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
