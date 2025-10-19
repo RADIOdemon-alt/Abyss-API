@@ -10,6 +10,7 @@ import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import dotenv from 'dotenv';
+
 // 🧩 API Routes
 import firebaseRoute from './routes/firebase.js';
 import tools_tr from './routes/tools-tr.js';
@@ -36,15 +37,21 @@ import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
 import spotify_dl from './routes/Spotify_dl.js';
 
+dotenv.config(); // لازم يكون قبل أي استخدام للـ routes
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
 //------------------------------------------------------
-// ⚙️ إعداد Body Parser
+// ⚙️ Body Parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+//------------------------------------------------------
+// ⚙️ ضبط trust proxy لتجنب التحذيرات
+app.set('trust proxy', 1); // مهم إذا السيرفر خلف بروكسي (Vercel, Heroku, Nginx)
 
 //------------------------------------------------------
 // 🛡️ إعدادات الأمان
@@ -52,6 +59,9 @@ app.use(helmet());
 app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
+
+//------------------------------------------------------
+// ⚡ Rate Limit و SlowDown
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 
@@ -71,8 +81,6 @@ app.use(express.static(publicDir, { extensions: ['html', 'htm'] }));
 
 //------------------------------------------------------
 // 🔹 API routes
-dotenv.config(); // لازم يكون قبل أي استيراد للـ routes أو Firebase
-
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -97,6 +105,7 @@ app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
 app.use('/api/firebase', firebaseRoute);
+
 //------------------------------------------------------
 // 🧭 التعامل مع الصفحات
 app.get('/:page?', (req, res, next) => {
@@ -105,23 +114,17 @@ app.get('/:page?', (req, res, next) => {
   const indexPath = path.join(folderPath, 'index.html');
   const rootIndex = path.join(publicDir, 'index.html');
 
-  // ✅ الصفحة موجودة
   if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
-  // ✅ الصفحة الرئيسية
   if (page === 'index' && fs.existsSync(rootIndex)) return res.sendFile(rootIndex);
-  // غير كده -> نكمل للميدل وير التالي (اللي هو 404)
   next();
 });
 
 //------------------------------------------------------
-// 🩸 صفحة 404 مخصصة (HTML المزخرف اللي انت حاطه)
+// 🩸 صفحة 404 مخصصة
 app.use((req, res) => {
   const notFoundPath = path.join(publicDir, '404.html');
-  if (fs.existsSync(notFoundPath)) {
-    res.status(404).sendFile(notFoundPath);
-  } else {
-    res.status(404).send('404 - الصفحة غير موجودة 🚫');
-  }
+  if (fs.existsSync(notFoundPath)) res.status(404).sendFile(notFoundPath);
+  else res.status(404).send('404 - الصفحة غير موجودة 🚫');
 });
 
 //------------------------------------------------------
