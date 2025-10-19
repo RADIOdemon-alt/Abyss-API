@@ -1,4 +1,4 @@
-// index.js (Full Auto Multi-Page + API Server)
+// index.js (Full Auto Multi-Page + 404 Theme)
 import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -55,7 +55,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 
 //------------------------------------------------------
-// 🌍 السماح بالـ HTTPS فقط (اختياري)
+// 🌍 HTTPS فقط (اختياري)
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
     return res.redirect('https://' + req.headers.host + req.url);
@@ -67,40 +67,6 @@ app.use((req, res, next) => {
 // 📂 ملفات static
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir, { extensions: ['html', 'htm'] }));
-
-//------------------------------------------------------
-// 🧭 التعامل مع الصفحات الفرعية
-app.get('/:page?', (req, res) => {
-  const page = req.params.page || 'index';
-  const folderPath = path.join(publicDir, page);
-  const indexPath = path.join(folderPath, 'index.html');
-  const rootIndex = path.join(publicDir, 'index.html');
-  const notFoundPage = path.join(publicDir, '404.html');
-
-  // ✅ لو الصفحة موجودة
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
-  }
-
-  // ✅ الصفحة الرئيسية
-  if (page === 'index' && fs.existsSync(rootIndex)) {
-    return res.sendFile(rootIndex);
-  }
-
-  // 🧩 فهرس المجلد (للتطوير فقط)
-  if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
-    const files = fs.readdirSync(folderPath);
-    const list = files.map(f => `<li><a href="/${page}/${f}">${f}</a></li>`).join('');
-    return res.send(`<h2>📂 محتويات المجلد /${page}</h2><ul>${list}</ul>`);
-  }
-
-  // 🚫 الصفحة غير موجودة
-  if (fs.existsSync(notFoundPage)) {
-    return res.status(404).sendFile(notFoundPage);
-  } else {
-    return res.status(404).send('404 - الصفحة غير موجودة 🚫');
-  }
-});
 
 //------------------------------------------------------
 // 🔹 API routes
@@ -127,6 +93,33 @@ app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
+
+//------------------------------------------------------
+// 🧭 التعامل مع الصفحات
+app.get('/:page?', (req, res, next) => {
+  const page = req.params.page || 'index';
+  const folderPath = path.join(publicDir, page);
+  const indexPath = path.join(folderPath, 'index.html');
+  const rootIndex = path.join(publicDir, 'index.html');
+
+  // ✅ الصفحة موجودة
+  if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+  // ✅ الصفحة الرئيسية
+  if (page === 'index' && fs.existsSync(rootIndex)) return res.sendFile(rootIndex);
+  // غير كده -> نكمل للميدل وير التالي (اللي هو 404)
+  next();
+});
+
+//------------------------------------------------------
+// 🩸 صفحة 404 مخصصة (HTML المزخرف اللي انت حاطه)
+app.use((req, res) => {
+  const notFoundPath = path.join(publicDir, '404.html');
+  if (fs.existsSync(notFoundPath)) {
+    res.status(404).sendFile(notFoundPath);
+  } else {
+    res.status(404).send('404 - الصفحة غير موجودة 🚫');
+  }
+});
 
 //------------------------------------------------------
 // 🚨 التعامل مع الأخطاء العامة
