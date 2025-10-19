@@ -1,7 +1,8 @@
-const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الروتز
-  const API_KEY = "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa"; // API Key
+document.addEventListener("DOMContentLoaded", () => {
+  const API_URL = "https://dark-api-x.vercel.app/api/firebase";
+  const API_KEY = "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa";
 
-  // ======= الرسائل =======
+  // ===== الرسائل =====
   function showMessage(msg, type="error") {
     const messageBox = document.getElementById("message-box");
     const loginBox = document.getElementById("login-box");
@@ -20,7 +21,7 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
     }, 3000);
   }
 
-  // ======= التبديل بين الكاردين =======
+  // ===== التبديل بين النماذج =====
   function toggleForms() {
     const loginBox = document.getElementById("login-box");
     const registerBox = document.getElementById("register-box");
@@ -28,7 +29,7 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
     registerBox.classList.toggle("hidden");
   }
 
-  // ======= قائمة الدول =======
+  // ===== قائمة الدول =====
   const countriesList = [
     { "name": "مصر", "code": "20", "flag": "🇪🇬" },
     { "name": "السعودية", "code": "966", "flag": "🇸🇦" },
@@ -88,17 +89,17 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
       phoneInput.dataset.flag = first.flag;
     }
   }
+
   populateCountries();
   selectedDiv.addEventListener("click", () => optionsList.classList.toggle("hidden"));
   document.addEventListener("click", (e) => { if(!countrySelect.contains(e.target)) optionsList.classList.add("hidden"); });
 
-  // ======= تسجيل جديد =======
+  // ===== تسجيل جديد =====
   async function register() {
     const name = document.getElementById("reg-name").value.trim();
     const phone = phoneInput.value.trim();
     const email = document.getElementById("reg-email").value.trim();
     const password = document.getElementById("reg-password").value.trim();
-
     const country = {
       name: phoneInput.dataset.name || "",
       code: phoneInput.dataset.code || "",
@@ -115,15 +116,10 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
     try {
       const res = await fetch(`${API_URL}/register`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
         body: JSON.stringify(payload)
       });
-
       const data = await res.json();
-
       if (data.success) {
         showPopup(`Welcome ${name}!\nOn the dark API platform`, [
           { title: "𝐑𝐀𝐃𝐈𝐎 𝐃𝐄𝐌𝐎𝐍", subtitle: "Developer" },
@@ -133,14 +129,13 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
       } else {
         showMessage(data.message, "error");
       }
-
     } catch (err) {
       console.error(err);
       showMessage("❌ حدث خطأ أثناء التسجيل", "error");
     }
   }
 
-  // ======= تسجيل دخول =======
+  // ===== تسجيل دخول =====
   async function login() {
     const email = document.getElementById("login-email").value.trim();
     const password = document.getElementById("login-password").value.trim();
@@ -153,10 +148,7 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
     try {
       const res = await fetch(`${API_URL}/login`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-api-key": API_KEY
-        },
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
@@ -174,7 +166,7 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
     }
   }
 
-  // ======= البوبيت =======
+  // ===== البوب أب =====
   function showPopup(message, cards=[]) {
     const loginBox = document.getElementById("login-box");
     const registerBox = document.getElementById("register-box");
@@ -193,13 +185,14 @@ const API_URL = "https://dark-api-x.vercel.app/api/firebase"; // مسار الر
     document.body.appendChild(popup);
     popup.style.animation = "fadeIn 0.5s ease";
 
-    // إزالة البوبيت بعد 5 ثواني والتحويل
     setTimeout(() => {
       popup.remove();
       window.location.href = "https://dark-api-x.vercel.app/home/";
     }, 5000);
   }
 
+  // ربط الدوال بالـ window
   window.toggleForms = toggleForms;
   window.register = register;
   window.login = login;
+});
