@@ -1,20 +1,16 @@
-// index.js (Protected Version with .env API Key)
+// index.js (Full Auto Multi-Page + API Server)
 import express from 'express';
-import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
-
-// 🧱 أمان وحماية
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import xssClean from 'xss-clean';
 import mongoSanitize from 'express-mongo-sanitize';
+import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 
-//-------------------------------------------------------
+// 🧩 API Routes
 import tools_tr from './routes/tools-tr.js';
 import pinterest from './routes/download-pinterest.js';
 import tiktok from './routes/download-tiktok.js';
@@ -31,45 +27,30 @@ import ai_music from './routes/ai-music.js';
 import gemini from './routes/AI-Gemini.js';
 import deepimg from './routes/Ai-deep_img.js';
 import toanime from './routes/Tools-to_anime.js';
-import elevenlab from './routes/elevenlab.js'; 
+import elevenlab from './routes/elevenlab.js';
 import checkporn from './routes/Tools-check_porn.js';
 import codetest from './routes/Tools-code_test.js';
 import anime_voice from './routes/anime-voice.js';
 import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
-import spotify_dl from './routes/Spotify_dl.js'; 
-//-------------------------------------------------------
-dotenv.config();
+import spotify_dl from './routes/Spotify_dl.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
-const API_KEY = process.env.API_KEY || "drk_supersecret123"; // من .env
 
 //------------------------------------------------------
-// 🛡️ إعدادات الحماية العامة
+// 🛡️ إعدادات الأمان العامة
 app.use(helmet());
 app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
-
-// 🕒 Rate Limit + SlowDown
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: '🚫 تم تجاوز الحد المسموح من الطلبات، حاول لاحقًا' }
-});
-app.use(limiter);
-
-const speedLimiter = slowDown({
-  windowMs: 15 * 60 * 1000,
-  delayAfter: 100,
-  delayMs: 500
-});
-app.use(speedLimiter);
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 
 //------------------------------------------------------
-// 🌍 السماح فقط بالـ HTTPS (على سيرفر خارجي)
+// 🌍 السماح بالـ HTTPS فقط (اختياري)
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] && req.headers['x-forwarded-proto'] !== 'https') {
     return res.redirect('https://' + req.headers.host + req.url);
@@ -78,54 +59,41 @@ app.use((req, res, next) => {
 });
 
 //------------------------------------------------------
-// 📁 ملفات static مفتوحة لأي زائر
-app.use(express.static(path.join(__dirname, 'public'), {
-  dotfiles: 'deny',
-  index: false,
-  redirect: false
-}));
+// 📂 ملفات static لأي نوع (html / css / js / img)
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir, { extensions: ['html', 'htm'] }));
 
 //------------------------------------------------------
-// 🔹 الصفحة الرئيسية مفتوحة لأي زائر
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// 🧭 التعامل مع الصفحات الفرعية مثل /home → public/home/index.html
+app.get('/:page?', (req, res) => {
+  const page = req.params.page || 'index';
+  const folderPath = path.join(publicDir, page);
+  const indexPath = path.join(folderPath, 'index.html');
+  const rootIndex = path.join(publicDir, 'index.html');
 
-// 🔹 صفحة /home (لو موجودة)
-const homePagePath = path.join(__dirname, 'public', 'page', 'home', 'index.html');
-if (fs.existsSync(homePagePath)) {
-  app.get('/home', (req, res) => res.sendFile(homePagePath));
-  console.log('✅ صفحة /home متصلة:', homePagePath);
-} else {
-  console.log('❌ صفحة home غير موجودة:', homePagePath);
-}
-
-//------------------------------------------------------
-// 🔹 توليد تلقائي لمسارات الصفحات داخل public/page/ (مفتوحة)
-const pagesBase = path.join(__dirname, 'public/page');
-if (fs.existsSync(pagesBase)) {
-  const pageFolders = fs.readdirSync(pagesBase).filter(folder =>
-    fs.statSync(path.join(pagesBase, folder)).isDirectory()
-  );
-  pageFolders.forEach(folder => {
-    app.get(`/${folder}`, (req, res) => {
-      res.sendFile(path.join(pagesBase, folder, 'index.html'));
-    });
-  });
-}
-
-//------------------------------------------------------
-// 🔑 حماية كل مسارات /api/* بمفتاح API من .env
-app.use('/api', (req, res, next) => {
-  const key = req.query.key || req.headers['x-api-key'];
-  if (!key || key !== API_KEY) {
-    return res.status(403).json({ error: '⛔️ الوصول مرفوض - مفتاح API غير صالح أو مفقود' });
+  // ✅ لو الصفحة موجودة (مجلد + index.html)
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
   }
-  next();
+
+  // ✅ لو الصفحة الرئيسية
+  if (page === 'index' && fs.existsSync(rootIndex)) {
+    return res.sendFile(rootIndex);
+  }
+
+  // 🧩 فهرس المجلد (للتطوير فقط)
+  if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+    const files = fs.readdirSync(folderPath);
+    const list = files.map(f => `<li><a href="/${page}/${f}">${f}</a></li>`).join('');
+    return res.send(`<h2>📂 محتويات المجلد /${page}</h2><ul>${list}</ul>`);
+  }
+
+  // 🚫 الصفحة غير موجودة
+  return res.status(404).send('404 - الصفحة غير موجودة 🚫');
 });
 
 //------------------------------------------------------
-// 🔹 كل الـ API routes هنا
+// 🔹 كل الـ API routes (بدون vercel.json)
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -142,13 +110,13 @@ app.use('/api/ai_music', ai_music);
 app.use('/api/gemini', gemini);
 app.use('/api/deep_img', deepimg);
 app.use('/api/to_anime', toanime);
-app.use('/api/elevenlab', elevenlab); 
+app.use('/api/elevenlab', elevenlab);
 app.use('/api/check_porn', checkporn);
-app.use('/api/code_test', codetest); 
+app.use('/api/code_test', codetest);
 app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
-app.use('/api/spotify_dl', spotify_dl); 
+app.use('/api/spotify_dl', spotify_dl);
 
 //------------------------------------------------------
 // 🚨 التعامل مع الأخطاء العامة
@@ -160,5 +128,5 @@ app.use((err, req, res, next) => {
 //------------------------------------------------------
 // 🚀 تشغيل السيرفر
 app.listen(port, () => {
-  console.log(`✅ Server running securely on port ${port}`);
+  console.log(`✅ Server running perfectly on http://localhost:${port}`);
 });
