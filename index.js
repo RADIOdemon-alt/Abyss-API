@@ -1,3 +1,4 @@
+// index.js
 import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -8,7 +9,6 @@ import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import dotenv from 'dotenv';
-import helmet from 'helmet';
 
 // 🧩 Import API routes
 import firebaseRoute from './routes/firebase.js';
@@ -47,27 +47,22 @@ const port = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 🛡️ Helmet مع تعطيل CSP
-app.use(
-  helmet({
-    contentSecurityPolicy: false // ❌ تعطيل CSP نهائي
-  })
-);
+// === ملاحظة: تم إزالة helmet بالكامل كما طلبت ===
 
+// ضغط وإجراءات تنظيف
 app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
 
 // ⚡ Rate limit & SlowDown
-app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }));
-app.use(slowDown({ windowMs: 15*60*1000, delayAfter: 100, delayMs: 300 }));
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 
 // 📂 ملفات static
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
 
-// 🔹 API routes
-app.use('/api/firebase', firebaseRoute);
+// 🔹 API routes (كل الروتات)
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -91,13 +86,14 @@ app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
+app.use('/api/firebase', firebaseRoute);
 
 // 🧭 الصفحة الرئيسية
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-// 🧭 صفحات فرعية
+// 🧭 صفحات فرعية لو عندك داخل public/pages
 app.get('/pages/:page', (req, res, next) => {
   const pagePath = path.join(publicDir, 'pages', req.params.page, 'index.html');
   if (fs.existsSync(pagePath)) return res.sendFile(pagePath);
@@ -111,7 +107,7 @@ app.use((req, res) => {
   else res.status(404).send('404 - الصفحة غير موجودة 🚫');
 });
 
-// 🚨 Errors
+// 🚨 Error handler
 app.use((err, req, res, next) => {
   console.error('❌ Internal Error:', err.stack);
   res.status(500).json({ error: '🔥 Internal Server Error' });
