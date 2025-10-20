@@ -2,13 +2,13 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
-import helmet from 'helmet';
 import compression from 'compression';
 import xssClean from 'xss-clean';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 
 // 🧩 Import API routes
 import firebaseRoute from './routes/firebase.js';
@@ -47,23 +47,13 @@ const port = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 🛡️ Security with CSP allowing self-hosted JS/CSS/images
+// 🛡️ Helmet مع تعطيل CSP
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],       // يسمح فقط لملفات JS من نفس السيرفر
-        styleSrc: ["'self'", "'unsafe-inline'", "https:"], // يسمح للـ CSS والـ inline styles
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", "https://dark-api-x.vercel.app"], // للـ API calls
-        fontSrc: ["'self'", "https:", "data:"],
-        objectSrc: ["'none'"],
-        frameSrc: ["'none'"]
-      }
-    }
+    contentSecurityPolicy: false // ❌ تعطيل CSP نهائي
   })
 );
+
 app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
@@ -77,6 +67,7 @@ const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
 
 // 🔹 API routes
+app.use('/api/firebase', firebaseRoute);
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -100,14 +91,13 @@ app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
-app.use('/api/firebase', firebaseRoute);
 
 // 🧭 الصفحة الرئيسية
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-// 🧭 صفحات فرعية لو عندك داخل public/pages
+// 🧭 صفحات فرعية
 app.get('/pages/:page', (req, res, next) => {
   const pagePath = path.join(publicDir, 'pages', req.params.page, 'index.html');
   if (fs.existsSync(pagePath)) return res.sendFile(pagePath);
