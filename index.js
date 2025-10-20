@@ -51,10 +51,10 @@ app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }));
 app.use(slowDown({ windowMs: 15*60*1000, delayAfter: 100, delayMs: 300 }));
 
 app.use((req, res, next) => {
-  res.setHeader("Content-Security-Policy", 
+  res.setHeader("Content-Security-Policy",
     "default-src 'self'; " +
-    "script-src 'self'; " +
-    "style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
     "font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; " +
     "img-src 'self' data: https://files.catbox.moe; " +
     "media-src https://files.catbox.moe; " +
@@ -62,7 +62,6 @@ app.use((req, res, next) => {
   );
   next();
 });
-
 /*❖❖❖*/
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
