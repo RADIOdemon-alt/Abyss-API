@@ -32,7 +32,7 @@ import codetest from './routes/Tools-code_test.js';
 import anime_voice from './routes/anime-voice.js';
 import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
-import spotify_dl from './routes/Spotify_dl.js';
+import spotify_dl from './routes/spotify_dl.js';
 import sora from './routes/sora.js';
 
 dotenv.config();
