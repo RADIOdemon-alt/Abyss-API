@@ -1,4 +1,4 @@
-السيرفرdex.js (Full Auto Multi-Page + 404 Theme)
+// index.js (Full Auto Multi-Page + 404 Theme)
 import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -79,20 +79,24 @@ app.get('/pages/:page', (req, res, next) => {
   if (fs.existsSync(pagePath)) return res.sendFile(pagePath);
   next();
 });
+
 //------------------------------------------------------
+// 🩸 صفحة 404 مخصصة
 app.use((req, res) => {
   const notFoundPath = path.join(publicDir, '404.html');
   if (fs.existsSync(notFoundPath)) res.status(404).sendFile(notFoundPath);
   else res.status(404).send('404 - الصفحة غير موجودة 🚫');
 });
-//------------------------------------------------------
 
+//------------------------------------------------------
+// 🚨 التعامل مع الأخطاء العامة
 app.use((err, req, res, next) => {
   console.error('❌ Internal Error:', err.stack);
   res.status(500).json({ error: '🔥 Internal Server Error' });
 });
 
 //------------------------------------------------------
+// 🚀 تشغيل السيرفر
 app.listen(port, () => {
   console.log(`✅ Server running perfectly on http://localhost:${port}`);
 });
