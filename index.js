@@ -33,6 +33,7 @@ import anime_voice from './routes/anime-voice.js';
 import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
 import spotify_dl from './routes/Spotify_dl.js';
+import sora from './routes/sora.js';
 
 dotenv.config();
 
@@ -90,6 +91,7 @@ app.use('/api/anime-voice', anime_voice);
 app.use('/api/video_generate', videogenerate);
 app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
+app.use('/api/sora', sora);
 app.use('/api/firebase', firebaseRoute);
 /*❖❖❖*/
 
