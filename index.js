@@ -47,8 +47,23 @@ const port = process.env.PORT || 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 🛡️ Security
-app.use(helmet());
+// 🛡️ Security with CSP allowing self-hosted JS/CSS/images
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],       // يسمح فقط لملفات JS من نفس السيرفر
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"], // يسمح للـ CSS والـ inline styles
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://dark-api-x.vercel.app"], // للـ API calls
+        fontSrc: ["'self'", "https:", "data:"],
+        objectSrc: ["'none'"],
+        frameSrc: ["'none'"]
+      }
+    }
+  })
+);
 app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
