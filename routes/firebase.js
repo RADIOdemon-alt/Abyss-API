@@ -19,7 +19,6 @@ const router = express.Router();
 const MY_API_KEY = "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa";
 
 router.use((req, res, next) => {
-router.use((req, res, next) => {
   const apiKey = req.headers['x-api-key'] || req.query.api_key; // ← تعديل هنا
   if (!apiKey || apiKey !== MY_API_KEY) {
     return res.status(403).json({ success: false, message: "❌ API Key غير صحيح" });
