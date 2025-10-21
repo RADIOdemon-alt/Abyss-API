@@ -114,5 +114,4 @@ router.get('/status/:uid', async (req, res) => {
     res.status(500).json({ success: false, message: "❌ خطأ في التحقق من الحالة" });
   }
 });
-
 export default router;
