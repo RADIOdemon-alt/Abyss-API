@@ -78,11 +78,11 @@ class SpotifyDL {
 
     if (!res.data || res.data.length === 0)
       throw new Error("⚠️ فشل في تحميل الصوت من المصدر.");
-    return res.data;
+    return Buffer.from(res.data);
   }
 }
 
-/** 🎧 POST Route */
+/* 🎧 POST Route */
 router.post("/", async (req, res) => {
   try {
     const { url, index = 1 } = req.body;
@@ -102,16 +102,17 @@ router.post("/", async (req, res) => {
       });
 
     const track = tracks[i];
-    const file = await spotify.downloadTrack(track);
+    const fileBuffer = await spotify.downloadTrack(track);
 
-    res.set({
+    const fileName = `${track.name.replace(/[\\/:*?"<>|]/g, "").slice(0, 100)}.mp3`;
+
+    res.writeHead(200, {
       "Content-Type": "audio/mpeg",
-      "Content-Disposition": `attachment; filename="${track.name
-        .replace(/[\\/:*?"<>|]/g, "")
-        .slice(0, 100)}.mp3"`,
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Length": fileBuffer.length,
     });
 
-    res.send(Buffer.from(file));
+    res.end(fileBuffer);
   } catch (err) {
     console.error("❌ Spotify Error:", err.message);
     res.status(500).json({
@@ -122,7 +123,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-/** 🎧 GET Route */
+/* 🎧 GET Route */
 router.get("/", async (req, res) => {
   try {
     const { url, index = 1 } = req.query;
@@ -142,16 +143,17 @@ router.get("/", async (req, res) => {
       });
 
     const track = tracks[i];
-    const file = await spotify.downloadTrack(track);
+    const fileBuffer = await spotify.downloadTrack(track);
 
-    res.set({
+    const fileName = `${track.name.replace(/[\\/:*?"<>|]/g, "").slice(0, 100)}.mp3`;
+
+    res.writeHead(200, {
       "Content-Type": "audio/mpeg",
-      "Content-Disposition": `attachment; filename="${track.name
-        .replace(/[\\/:*?"<>|]/g, "")
-        .slice(0, 100)}.mp3"`,
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Length": fileBuffer.length,
     });
 
-    res.send(Buffer.from(file));
+    res.end(fileBuffer);
   } catch (err) {
     console.error("❌ Spotify Error:", err.message);
     res.status(500).json({
