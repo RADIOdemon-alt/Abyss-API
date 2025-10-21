@@ -1,13 +1,7 @@
 import express from 'express';
+import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import fs from 'fs';
-import compression from 'compression';
-import xssClean from 'xss-clean';
-import mongoSanitize from 'express-mongo-sanitize';
-import rateLimit from 'express-rate-limit';
-import slowDown from 'express-slow-down';
-import dotenv from 'dotenv';
 
 /* ❖ استيراد جميع المسارات (Routes) ❖ */
 import firebaseRoute from './routes/firebase.js';
@@ -35,41 +29,26 @@ import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
 import spotify_dl from './routes/spotify_dl.js';
 import spot from './routes/spot.js';
-import sound_claude from './routes/sound-claude.js'; // ✅ أُعيد المسار القديم
-import sound_claude_dl from './routes/sound-claude-dl.js'; // ✅ المسار الجديد
+import sound_claude from './routes/sound-claude.js';
+import sound_claude_dl from './routes/sound-claude-dl.js';
 
-dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
-/* ❖ إعدادات الأمان والأداء ❖ */
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(compression());
-app.use(xssClean());
-app.use(mongoSanitize());
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
-app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use((req, res, next) => {
-  res.setHeader("Content-Security-Policy",
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
-    "font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; " +
-    "img-src 'self' data: https://files.catbox.moe; " +
-    "media-src https://files.catbox.moe; " +
-    "connect-src 'self';"
-  );
-  next();
+
+app.use(express.static(__dirname));
+
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
 });
 
-/* ❖ مجلد الملفات العامة ❖ */
-const publicDir = path.join(__dirname, 'public');
-app.use(express.static(publicDir));
+app.get('/home', (req, res) => {
+  res.sendFile(__dirname + '/public/home/index.html');
+});
 
 /* ❖ تعريف المسارات ❖ */
 app.use('/api/tr', tools_tr);
@@ -97,31 +76,10 @@ app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
 app.use('/api/spot', spot);
 app.use('/api/firebase', firebaseRoute);
-app.use('/api/sound_claude', sound_claude); // ✅ أُعيد المسار الأصلي
-app.use('/api/sound_claude_dl', sound_claude_dl); // ✅ وأُبقي المسار الجديد
+app.use('/api/sound_claude', sound_claude);
+app.use('/api/sound_claude_dl', sound_claude_dl);
 
-/* ❖ الصفحة الرئيسية ❖ */
-app.get('/', (req, res) => res.sendFile(path.join(publicDir, 'index.html')));
 
-/* ❖ صفحات داخلية ❖ */
-app.get('/pages/:page', (req, res, next) => {
-  const pagePath = path.join(publicDir, 'pages', req.params.page, 'index.html');
-  if (fs.existsSync(pagePath)) return res.sendFile(pagePath);
-  next();
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
-
-/* ❖ صفحة 404 ❖ */
-app.use((req, res) => {
-  const notFoundPath = path.join(publicDir, '404.html');
-  if (fs.existsSync(notFoundPath)) res.status(404).sendFile(notFoundPath);
-  else res.status(404).send('404 - الصفحة غير موجودة 🚫');
-});
-
-/* ❖ معالجة الأخطاء ❖ */
-app.use((err, req, res, next) => {
-  console.error('❌ Internal Error:', err.stack);
-  res.status(500).json({ error: '🔥 Internal Server Error' });
-});
-
-/* ❖ تشغيل السيرفر ❖ */
-app.listen(port, () => console.log(`✅ Server running on http://localhost:${port}`));
