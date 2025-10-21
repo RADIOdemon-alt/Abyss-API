@@ -523,64 +523,179 @@ button:hover {
   <div id="msgBox" class="msgBox"></div>
   
 <script>
-(async () => {
-  // إنشاء div لعرض النتائج
-  const resultDiv = document.createElement("div");
-  resultDiv.id = "apiDebug";
-  resultDiv.style.cssText = `
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    width: 400px;
-    max-height: 90vh;
-    overflow-y: auto;
-    background: rgba(0,0,0,0.9);
-    color: #0f0;
-    font-family: monospace;
-    font-size: 14px;
-    padding: 10px;
-    z-index: 99999;
-    border: 2px solid #0f0;
-    white-space: pre-wrap;
-  `;
-  document.body.appendChild(resultDiv);
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-  function log(msg){
-    console.log(msg);
-    resultDiv.textContent += msg + "\n";
-  }
+const firebaseConfig = {
+  apiKey: "AIzaSyAb12YNs0qOVF8dWoPJK0jG7mUG-zk-K7w",
+  authDomain: "dark-api-f4ec2.firebaseapp.com",
+  projectId: "dark-api-f4ec2",
+  storageBucket: "dark-api-f4ec2.firebasestorage.app",
+  messagingSenderId: "859798996765",
+  appId: "1:859798996765:web:c80a13987f0caae69283f4",
+  measurementId: "G-NHEWELXPQY"
+};
 
-  const savedUID = localStorage.getItem("dark_uid");
-  const apiKey = "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa";
 
-  if(!savedUID){
-    return log("❌ No UID in localStorage");
-  }
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const msgBox = document.getElementById("msgBox");
 
-  try {
-    const url = `https://dark-api-x.vercel.app/api/firebase/status/${savedUID}?api_key=${apiKey}`;
-    log("🔹 Fetching URL: " + url);
+let currentUser = null;
 
-    const res = await fetch(url);
-    log("🔹 Response status: " + res.status);
-
-    const data = await res.json();
-    log("🔹 Response JSON: " + JSON.stringify(data, null, 2));
-
-    if(data.success && data.user){
-      log("✅ User found!");
-      Object.entries(data.user).forEach(([key, value]) => {
-        log(`${key}: ${value}`);
-      });
-    } else {
-      log("❌ User not found or invalid UID");
+// Typing effect
+function typeWriter(text, el, speed = 100) {
+  el.textContent = "";
+  let i = 0;
+  function type() {
+    if (i < text.length) {
+      el.textContent += text[i];
+      i++;
+      setTimeout(type, speed);
     }
-
-  } catch(err){
-    log("⚠️ Connection error:");
-    log(err);
   }
-})();
+  type();
+}
+
+// Firebase login check
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const userName = userDoc.exists() ? userDoc.data().name : "User";
+    typeWriter(`Welcome, ${userName} to Dark API DEV by RADIO AND IZANA`, document.getElementById("typewriter"), 80);
+  } else {
+    currentUser = null;
+    typeWriter("❌ You are not logged in", document.getElementById("typewriter"), 80);
+  }
+});
+
+// Show message
+function showMessage(text, type = "error") {
+  msgBox.textContent = text;
+  msgBox.className = `msgBox ${type}`;
+  msgBox.style.display = "block";
+  setTimeout(() => msgBox.style.display = "none", 2500);
+}
+
+// ===== مودال API Test =====
+const apiModal = document.createElement("div");
+apiModal.id = "apiModal";
+apiModal.className = "api-modal";
+apiModal.innerHTML = `
+  <div class="api-modal-content">  
+    <span class="close-btn">&times;</span>  
+    <h2>🔮 API Preview</h2>  
+    <div class="progress-bar"><div class="progress"></div></div>  
+    <pre id="apiResult"></pre>  
+  </div>  
+`;  
+document.body.appendChild(apiModal);
+
+const closeBtn = apiModal.querySelector(".close-btn");
+const apiResult = apiModal.querySelector("#apiResult");
+const progressBar = apiModal.querySelector(".progress");
+
+closeBtn.addEventListener("click", () => { 
+  apiModal.style.display = "none"; 
+  progressBar.style.width = "0%"; 
+});
+window.addEventListener("click", e => { 
+  if (e.target === apiModal) { 
+    apiModal.style.display = "none"; 
+    progressBar.style.width = "0%"; 
+  } 
+});
+
+// Buttons
+document.querySelectorAll(".test-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    if (!currentUser) return showMessage("⚠️ Please login first", "error");
+
+    apiModal.style.display = "flex";  
+    apiResult.textContent = "⏳ Testing API, please wait...";  
+    progressBar.style.width = "0%";  
+    progressBar.style.transition = "width 2s linear";  
+    setTimeout(() => progressBar.style.width = "100%", 50);  
+
+    try {  
+      const url = btn.dataset.link;  
+      const response = await fetch(url);  
+      const data = await response.json();  
+
+      setTimeout(() => {  
+        apiResult.textContent = JSON.stringify(data, null, 2);  
+      }, 2000);  
+
+    } catch (err) {  
+      progressBar.style.width = "100%";  
+      apiResult.textContent = "❌ API test failed:\n" + err;  
+      console.error(err);  
+    }
+  });
+});
+
+// Copy button
+document.querySelectorAll(".copy-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    if (!currentUser) return showMessage("⚠️ Please login first", "error");
+    try {
+      await navigator.clipboard.writeText(btn.dataset.copy);
+      btn.textContent = "✅";
+      showMessage("📋 Copied successfully!", "success");
+      setTimeout(() => btn.textContent = "Copy", 1500);
+    } catch {
+      showMessage("❌ Failed to copy", "error");
+    }
+  });
+});
+
+// Code button
+document.querySelectorAll(".code-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!currentUser) return showMessage("⚠️ Please login first", "error");
+    window.open(btn.dataset.whatsapp, "_blank");
+  });
+});
+
+// Sidebar toggle
+const toggleBtn = document.getElementById('toggleBtn');
+const sidebar = document.getElementById('sidebar');
+const dropdowns = document.querySelectorAll('.dropdown > a');
+
+toggleBtn.addEventListener('click', () => {
+  sidebar.classList.toggle('active');
+  toggleBtn.innerHTML = sidebar.classList.contains('active')
+    ? '<i class="fa-solid fa-xmark"></i>'
+    : '<i class="fa-solid fa-bars"></i>';
+});
+
+// Dropdown menus
+dropdowns.forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const parent = link.parentElement;
+    parent.classList.toggle('active');
+
+    const icon = link.querySelector('.fa-chevron-down');  
+    if (icon) icon.classList.toggle('rotate');  
+
+    dropdowns.forEach(other => {  
+      if (other !== link) other.parentElement.classList.remove('active');  
+    });
+  });
+});
+
+// Neon effect on sidebar links
+const links = document.querySelectorAll('#sidebar ul li a');
+links.forEach(a => {
+  a.addEventListener('click', e => {
+    links.forEach(l => l.classList.remove('active'));
+    a.classList.add('active');
+  });
+});
 </script>
 </body>
 </html>
