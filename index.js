@@ -52,7 +52,7 @@ app.get('/home', (req, res) => {
   res.sendFile(__dirname + '/public/home/index.html');
 });
 app.get('/download', (req, res) => {
-  res.sendFile(__dirname + '/public/api/download.html');
+  res.sendFile(__dirname + '/public/Api/download.html');
 });
 
 /* ❖ تعريف المسارات ❖ */
