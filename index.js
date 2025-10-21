@@ -32,13 +32,15 @@ import spot from './routes/spot.js';
 import sound_claude from './routes/sound-claude.js';
 import sound_claude_dl from './routes/sound-claude-dl.js';
 
-
 const app = express();
 const port = process.env.PORT || 3000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ✅ أضف هذا قبل تعريف أي Route
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static(__dirname));
 
@@ -78,7 +80,6 @@ app.use('/api/spot', spot);
 app.use('/api/firebase', firebaseRoute);
 app.use('/api/sound_claude', sound_claude);
 app.use('/api/sound_claude_dl', sound_claude_dl);
-
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
