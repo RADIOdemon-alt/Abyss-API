@@ -13,7 +13,6 @@ const COMMON_HEADERS = {
   "X-Requested-With": "mark.via.gp",
 };
 
-/** 🔹 تحليل الكوكيز من الاستجابة */
 function parseSetCookie(setCookieArray = []) {
   const jar = {};
   for (const s of setCookieArray) {
@@ -30,19 +29,17 @@ function parseSetCookie(setCookieArray = []) {
   return jar;
 }
 
-/** 🔹 دمج ملفات الكوكي */
 function mergeJars(dest, src) {
   for (const k of Object.keys(src)) dest[k] = src[k];
 }
 
-/** 🔹 تكوين الهيدر */
+
 function cookieHeaderFromJar(jar) {
   return Object.keys(jar)
     .map((k) => `${k}=${jar[k]}`)
     .join("; ");
 }
 
-/** 🔹 انتظار نتيجة المعالجة */
 async function waitForResult(jobId, cookieJar, maxTries = 15) {
   for (let i = 0; i < maxTries; i++) {
     const rres = await axios.get(
@@ -64,7 +61,6 @@ async function waitForResult(jobId, cookieJar, maxTries = 15) {
   return null;
 }
 
-/** 🧩 Route: /api/insta */
 router.all("/", async (req, res) => {
   try {
     const url = req.query.url || req.body.url;
@@ -81,7 +77,7 @@ router.all("/", async (req, res) => {
     const targetUrl = urlMatch[0];
     const cookieJar = {};
 
-    // 1️⃣ افتح الموقع لجلب csrf
+   
     const homeRes = await axios.get("https://instag.com/", {
       headers: { ...COMMON_HEADERS, Referer: "https://www.google.com/" },
       timeout: 15000,
@@ -100,7 +96,6 @@ router.all("/", async (req, res) => {
     if (csrf) params.append("csrfmiddlewaretoken", csrf);
     params.append("url", targetUrl);
 
-    // 2️⃣ أرسل إلى /api/manager/
     const managerRes = await axios.post("https://instag.com/api/manager/", params.toString(), {
       headers: {
         ...COMMON_HEADERS,
@@ -118,7 +113,7 @@ router.all("/", async (req, res) => {
     if (!managerRes.data)
       return res.status(500).json({ status: false, message: "⚠️ السيرفر رجع رد فاضي من /api/manager/" });
 
-    // 3️⃣ استخراج job_id
+   
     let jobId = null;
     const data = managerRes.data;
     if (typeof data === "object") {
@@ -135,12 +130,12 @@ router.all("/", async (req, res) => {
         raw: data,
       });
 
-    // 4️⃣ انتظر النتيجة
+   
     const resultData = await waitForResult(jobId, cookieJar, 15);
     if (!resultData)
       return res.status(408).json({ status: false, message: "⚠️ لم أجد نتيجة بعد الانتظار." });
 
-    // 5️⃣ استخراج رابط الميديا
+   ا
     let mediaUrl = null;
     if (resultData.html) {
       const $ = cheerio.load(resultData.html);
@@ -163,7 +158,6 @@ router.all("/", async (req, res) => {
         raw: resultData,
       });
 
-    // 6️⃣ تحميل الميديا وتحويلها إلى base64
     const fileRes = await axios.get(mediaUrl, {
       responseType: "arraybuffer",
       headers: {
