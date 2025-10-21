@@ -1,0 +1,72 @@
+import express from "express";
+import fetch from "node-fetch";
+import FormData from "form-data";
+
+const router = express.Router();
+
+/** 🎧 دالة التحميل من SoundCloud */
+async function downloadSoundCloud(url) {
+  try {
+    const form = new FormData();
+    form.append("url", url);
+    form.append("token", "");
+
+    const res = await fetch("https://scdler.com/wp-json/aio-dl/video-data/", {
+      method: "POST",
+      body: form,
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: "https://scdler.com/ar/soundcloud-downloader/",
+        Origin: "https://scdler.com",
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json",
+      },
+    });
+
+    const json = await res.json();
+
+    if (!json || !json.medias || json.medias.length === 0) {
+      throw new Error("لم يتم العثور على ملف صوتي.");
+    }
+
+    const media = json.medias[0];
+    return {
+      status: true,
+      title: json.title || "مقطع صوتي",
+      quality: media.quality || "صوت",
+      size: media.size || "غير معروف",
+      audioUrl: media.url,
+      thumb: json.thumbnail || null,
+    };
+  } catch (error) {
+    throw new Error(`فشل التحميل: ${error.message}`);
+  }
+}
+
+/** 📥 GET Route - تحميل من رابط SoundCloud */
+router.get("/", async (req, res) => {
+  try {
+    const url = req.query.url;
+    if (!url || !url.includes("soundcloud.com")) {
+      return res.status(400).json({
+        status: false,
+        message: "⚠️ أرسل رابط صوت صحيح من SoundCloud في المعامل (url)",
+      });
+    }
+
+    const result = await downloadSoundCloud(url);
+    res.json({
+      status: true,
+      message: "✅ تم الحصول على رابط التحميل بنجاح",
+      result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء تحميل الصوت من SoundCloud",
+      error: error.message,
+    });
+  }
+});
+
+export default router;
