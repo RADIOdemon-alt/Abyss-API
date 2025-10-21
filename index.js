@@ -35,7 +35,8 @@ import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
 import spotify_dl from './routes/spotify_dl.js';
 import spot from './routes/spot.js';
-import sound_claude_dl from './routes/sound-claude-dl.js'; // ✅ تمت الإضافة هنا
+import sound_claude from './routes/sound-claude.js'; // ✅ أُعيد المسار القديم
+import sound_claude_dl from './routes/sound-claude-dl.js'; // ✅ المسار الجديد
 
 dotenv.config();
 
@@ -96,7 +97,8 @@ app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
 app.use('/api/spot', spot);
 app.use('/api/firebase', firebaseRoute);
-app.use('/api/sound_claude_dl', sound_claude_dl); // ✅ إضافة المسار الجديد
+app.use('/api/sound_claude', sound_claude); // ✅ أُعيد المسار الأصلي
+app.use('/api/sound_claude_dl', sound_claude_dl); // ✅ وأُبقي المسار الجديد
 
 /* ❖ الصفحة الرئيسية ❖ */
 app.get('/', (req, res) => res.sendFile(path.join(publicDir, 'index.html')));
