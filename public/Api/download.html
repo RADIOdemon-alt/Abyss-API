@@ -522,178 +522,65 @@ button:hover {
 
   <div id="msgBox" class="msgBox"></div>
   
-  <script type="module">
-  
-let currentUser = null;
+<script>
+(async () => {
+  // إنشاء div لعرض النتائج
+  const resultDiv = document.createElement("div");
+  resultDiv.id = "apiDebug";
+  resultDiv.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.9);
+    color: #0f0;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    z-index: 99999;
+    border: 2px solid #0f0;
+    white-space: pre-wrap;
+  `;
+  document.body.appendChild(resultDiv);
 
-// Typing effect
-function typeWriter(text, el, speed=100){
-  el.textContent = "";
-  let i=0;
-  function type(){
-    if(i<text.length){
-      el.textContent += text[i];
-      i++;
-      setTimeout(type, speed);
-    }
+  function log(msg){
+    console.log(msg);
+    resultDiv.textContent += msg + "\n";
   }
-  type();
-}
 
-// ✅ التحقق من حالة المستخدم عبر API
-async function checkUserStatus() {
   const savedUID = localStorage.getItem("dark_uid");
-  if (!savedUID) {
-    currentUser = null;
-    return typeWriter("❌ You are not logged in", document.getElementById("typewriter"), 80);
+  const apiKey = "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa";
+
+  if(!savedUID){
+    return log("❌ No UID in localStorage");
   }
 
   try {
-    const res = await fetch(`https://dark-api-x.vercel.app/firebase/status/${savedUID}`, {
-      headers: { "x-api-key": "drk_iARHZmYf0ODK8m3WuDmKl0K9nHSMQZ35Zkwa" }
-    });
+    const url = `https://dark-api-x.vercel.app/api/firebase/status/${savedUID}?api_key=${apiKey}`;
+    log("🔹 Fetching URL: " + url);
+
+    const res = await fetch(url);
+    log("🔹 Response status: " + res.status);
+
     const data = await res.json();
+    log("🔹 Response JSON: " + JSON.stringify(data, null, 2));
 
-    if (data.success && data.user) {
-      currentUser = data.user;
-      typeWriter(`Welcome, ${data.user.name} to Dark API DEV by RADIO AND IZANA`, document.getElementById("typewriter"), 80);
+    if(data.success && data.user){
+      log("✅ User found!");
+      Object.entries(data.user).forEach(([key, value]) => {
+        log(`${key}: ${value}`);
+      });
     } else {
-      currentUser = null;
-      typeWriter("❌ User not found or not logged in", document.getElementById("typewriter"), 80);
+      log("❌ User not found or invalid UID");
     }
-  } catch (err) {
-    console.error("Status check error:", err);
-    currentUser = null;
-    typeWriter("⚠️ Connection error while checking login", document.getElementById("typewriter"), 80);
+
+  } catch(err){
+    log("⚠️ Connection error:");
+    log(err);
   }
-}
-
-// 🔄 تشغيل التحقق عند تحميل الصفحة
-checkUserStatus();
-
-// Show message
-function showMessage(text, type="error"){
-  msgBox.textContent = text;
-  msgBox.className = `msgBox ${type}`;
-  msgBox.style.display = "block";
-  setTimeout(()=> msgBox.style.display="none", 2500);
-}
-
-// ===== مودال API Test =====
-const apiModal = document.createElement("div");
-apiModal.id = "apiModal";
-apiModal.className = "api-modal";
-apiModal.innerHTML = `
-  <div class="api-modal-content">
-    <span class="close-btn">&times;</span>
-    <h2>🔮 API Preview</h2>
-    <div class="progress-bar"><div class="progress"></div></div>
-    <pre id="apiResult"></pre>
-  </div>
-`;
-document.body.appendChild(apiModal);
-
-const closeBtn = apiModal.querySelector(".close-btn");
-const apiResult = apiModal.querySelector("#apiResult");
-const progressBar = apiModal.querySelector(".progress");
-
-closeBtn.addEventListener("click", ()=>{ apiModal.style.display="none"; progressBar.style.width="0%"; });
-window.addEventListener("click", e => { if(e.target === apiModal){ apiModal.style.display="none"; progressBar.style.width="0%"; } });
-
-// Buttons
-document.querySelectorAll(".test-btn").forEach(btn=>{
-  btn.addEventListener("click", async ()=>{
-    if(!currentUser) return showMessage("⚠️ Please login first", "error");
-
-    // فتح المودال
-    apiModal.style.display = "flex";
-    apiResult.textContent = "⏳ Testing API, please wait...";
-    progressBar.style.width = "0%";
-    progressBar.style.transition = "width 2s linear";
-    setTimeout(()=> progressBar.style.width="100%", 50);
-
-    try {
-      const url = btn.dataset.link;
-      const response = await fetch(url);
-      const data = await response.json();
-
-      // عرض النتيجة بعد 2 ثانية (progress كامل)
-      setTimeout(()=>{
-        apiResult.textContent = JSON.stringify(data, null, 2);
-      }, 2000);
-
-    } catch(err){
-      progressBar.style.width="100%";
-      apiResult.textContent = "❌ API test failed:\n" + err;
-      console.error(err);
-    }
-  });
-});
-
-// Copy button
-document.querySelectorAll(".copy-btn").forEach(btn=>{
-  btn.addEventListener("click", async ()=>{
-    if(!currentUser) return showMessage("⚠️ Please login first", "error");
-    try{
-      await navigator.clipboard.writeText(btn.dataset.copy);
-      btn.textContent = "✅";
-      showMessage("📋 Copied successfully!", "success");
-      setTimeout(()=> btn.textContent = "Copy", 1500);
-    }catch{
-      showMessage("❌ Failed to copy", "error");
-    }
-  });
-});
-
-// Code button
-document.querySelectorAll(".code-btn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    if(!currentUser) return showMessage("⚠️ Please login first", "error");
-    window.open(btn.dataset.whatsapp, "_blank");
-  });
-});
-// زر فتح / غلق القائمة الجانبية
-
-const toggleBtn = document.getElementById('toggleBtn');
-const sidebar = document.getElementById('sidebar');
-const dropdowns = document.querySelectorAll('.dropdown > a');
-
-toggleBtn.addEventListener('click', () => {
-  sidebar.classList.toggle('active');
-  toggleBtn.innerHTML = sidebar.classList.contains('active')
-    ? '<i class="fa-solid fa-xmark"></i>'
-    : '<i class="fa-solid fa-bars"></i>';
-});
-
-// القوائم الفرعية (Products / Users)
-dropdowns.forEach(link => {
-  link.addEventListener('click', e => {
-    e.preventDefault();
-    const parent = link.parentElement;
-    parent.classList.toggle('active');
-
-    // إضافة تأثيرات إضاءة أثناء الفتح
-    const icon = link.querySelector('.fa-chevron-down');
-    if (icon) icon.classList.toggle('rotate');
-
-    // غلق باقي القوائم عند فتح واحدة
-    dropdowns.forEach(other => {
-      if (other !== link) other.parentElement.classList.remove('active');
-    });
-  });
-});
-
-// تأثير نيون بسيط على العناصر عند النقر
-const links = document.querySelectorAll('#sidebar ul li a');
-links.forEach(a => {
-  a.addEventListener('click', e => {
-    links.forEach(l => l.classList.remove('active'));
-    a.classList.add('active');
-  });
-});
-
-
-  
-  </script>
+})();
+</script>
 </body>
-  </html>
+</html>
