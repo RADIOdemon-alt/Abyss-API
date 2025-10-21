@@ -14,7 +14,9 @@ function setupPages(app, options = {}) {
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-
+app.get('/', (req, res) => {
+    res.sendFile(pageDir("app"));
+  });
   
 };
 
