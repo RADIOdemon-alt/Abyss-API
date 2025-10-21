@@ -45,6 +45,7 @@ function cookieHeaderFromJar(jar) {
 /** 🔹 انتظار نتيجة المعالجة */
 async function waitForResult(jobId, cookieJar, maxTries = 15) {
   for (let i = 0; i < maxTries; i++) {
+    console.log(`⌛ محاولة (${i + 1}/${maxTries}) لجلب النتيجة...`);
     const rres = await axios.get(
       `https://instag.com/api/result/?job_id=${encodeURIComponent(jobId)}`,
       {
@@ -57,17 +58,21 @@ async function waitForResult(jobId, cookieJar, maxTries = 15) {
       }
     );
     if (rres.status === 200 && rres.data && rres.data.loading !== true) {
+      console.log("✅ النتيجة جاهزة ✅");
       return rres.data;
     }
     await new Promise((r) => setTimeout(r, 2000));
   }
+  console.warn("⚠️ انتهت المحاولات بدون نتيجة");
   return null;
 }
 
-/** 🔹 الدالة الرئيسية لمعالجة الطلب */
+/** 🔹 الدالة الرئيسية */
 async function handleRequest(req, res) {
   try {
     const url = req.query.url || req.body.url;
+    console.log("🌐 URL المستلم:", url);
+
     if (!url)
       return res.status(400).json({
         status: false,
@@ -75,13 +80,17 @@ async function handleRequest(req, res) {
       });
 
     const urlMatch = url.match(/https?:\/\/(www\.)?instagram\.com\/[^\s]+/i);
-    if (!urlMatch)
+    if (!urlMatch) {
+      console.warn("❌ رابط إنستاجرام غير صالح:", url);
       return res.status(400).json({ status: false, message: "✘︙ضع رابط إنستاجرام صحيح." });
+    }
 
     const targetUrl = urlMatch[0];
     const cookieJar = {};
+    console.log("📥 الرابط النهائي:", targetUrl);
 
     // 1️⃣ افتح الموقع لجلب csrf
+    console.log("🚀 الخطوة 1: جلب csrf من الصفحة الرئيسية...");
     const homeRes = await axios.get("https://instag.com/", {
       headers: { ...COMMON_HEADERS, Referer: "https://www.google.com/" },
       timeout: 15000,
@@ -95,12 +104,14 @@ async function handleRequest(req, res) {
     const m1 = homeHtml.match(/name=["']csrfmiddlewaretoken["']\s+value=["']([^"']+)["']/i);
     if (m1) csrf = m1[1];
     if (!csrf && cookieJar.csrftoken) csrf = cookieJar.csrftoken;
+    console.log("🔑 csrf:", csrf || "غير موجود");
 
     const params = new URLSearchParams();
     if (csrf) params.append("csrfmiddlewaretoken", csrf);
     params.append("url", targetUrl);
 
     // 2️⃣ أرسل إلى /api/manager/
+    console.log("📡 الخطوة 2: إرسال الرابط إلى /api/manager/ ...");
     const managerRes = await axios.post("https://instag.com/api/manager/", params.toString(), {
       headers: {
         ...COMMON_HEADERS,
@@ -115,8 +126,10 @@ async function handleRequest(req, res) {
 
     mergeJars(cookieJar, parseSetCookie(managerRes.headers["set-cookie"] || []));
 
-    if (!managerRes.data)
+    if (!managerRes.data) {
+      console.error("⚠️ رد فاضي من /api/manager/");
       return res.status(500).json({ status: false, message: "⚠️ السيرفر رجع رد فاضي من /api/manager/" });
+    }
 
     // 3️⃣ استخراج job_id
     let jobId = null;
@@ -128,6 +141,8 @@ async function handleRequest(req, res) {
       if (mj) jobId = mj[1];
     }
 
+    console.log("🆔 job_id:", jobId);
+
     if (!jobId)
       return res.status(500).json({
         status: false,
@@ -136,11 +151,13 @@ async function handleRequest(req, res) {
       });
 
     // 4️⃣ انتظر النتيجة
+    console.log("⏳ الخطوة 3: انتظار نتيجة التحميل...");
     const resultData = await waitForResult(jobId, cookieJar, 15);
     if (!resultData)
       return res.status(408).json({ status: false, message: "⚠️ لم أجد نتيجة بعد الانتظار." });
 
     // 5️⃣ استخراج رابط الميديا
+    console.log("🔍 الخطوة 4: استخراج رابط الميديا...");
     let mediaUrl = null;
     if (resultData.html) {
       const $ = cheerio.load(resultData.html);
@@ -156,6 +173,8 @@ async function handleRequest(req, res) {
       }
     }
 
+    console.log("🎯 mediaUrl:", mediaUrl || "غير موجود");
+
     if (!mediaUrl)
       return res.status(404).json({
         status: false,
@@ -164,6 +183,7 @@ async function handleRequest(req, res) {
       });
 
     // 6️⃣ تحميل الميديا وتحويلها إلى base64
+    console.log("⬇️ الخطوة 5: تحميل الميديا وتحويلها Base64...");
     const fileRes = await axios.get(mediaUrl, {
       responseType: "arraybuffer",
       headers: {
@@ -177,6 +197,8 @@ async function handleRequest(req, res) {
     const base64 = buf.toString("base64");
     const type = fileRes.headers["content-type"] || "";
 
+    console.log(`✅ تم التحميل (${type})`);
+
     res.status(200).json({
       status: true,
       message: "✅ تم جلب ميديا إنستجرام بنجاح",
@@ -186,9 +208,10 @@ async function handleRequest(req, res) {
       base64: `data:${type};base64,${base64}`,
     });
   } catch (err) {
+    console.error("❌ خطأ أثناء التنفيذ:", err?.message || err);
     res.status(500).json({
       status: false,
-      message: "❌ خطأ غير متوقع",
+      message: "❌ خطأ غير متوقع أثناء جلب ميديا إنستجرام",
       error: err?.message || err,
     });
   }
