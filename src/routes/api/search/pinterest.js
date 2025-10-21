@@ -73,32 +73,23 @@ async function searchPinterest(query) {
   }
 }
 
-// ✅ POST /api/pinterest
-router.post('/', async (req, res) => {
-  const { query } = req.body;
-  if (!query)
-    return res.status(400).json({ status: false, message: "⚠️ يرجى إرسال query" });
 
-  const result = await searchPinterest(query);
-  return res.status(result.status ? 200 : 500).json(result);
-});
-
-// ✅ GET /api/pinterest
 router.get('/', async (req, res) => {
   const { query } = req.query;
 
-  // لو فيه ?query=anime
-  if (query) {
-    const result = await searchPinterest(query);
-    return res.status(result.status ? 200 : 500).json(result);
-  }
-
-  // لو مفيش query
-  res.json({
+  if (!query) {
+  return res.json({
     status: true,
     creator: "Dark-Team",
-    message: "📌 أرسل POST إلى هذا الرابط مع { query: 'كلمة البحث' } أو GET بـ ?query=",
+    message: "📌 أرسل بـ ?query=",
   });
+  }
+
+
+  const result = await searchPinterest(query);
+  
+  return res.status(result.status ? 200 : 500).json(result);
+  
 });
 
 export default router;
