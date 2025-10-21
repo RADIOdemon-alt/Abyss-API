@@ -13,6 +13,7 @@ const COMMON_HEADERS = {
   "X-Requested-With": "mark.via.gp",
 };
 
+/* ------------------------- دوال كوكيز ------------------------- */
 function parseSetCookie(setCookieArray = []) {
   const jar = {};
   for (const s of setCookieArray) {
@@ -32,7 +33,6 @@ function parseSetCookie(setCookieArray = []) {
 function mergeJars(dest, src) {
   for (const k of Object.keys(src)) dest[k] = src[k];
 }
-
 
 function cookieHeaderFromJar(jar) {
   return Object.keys(jar)
@@ -61,15 +61,27 @@ async function waitForResult(jobId, cookieJar, maxTries = 15) {
   return null;
 }
 
-router.all("/", async (req, res) => {
-  try {
-    const url = req.query.url || req.body.url;
-    if (!url)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ يرجى إرسال رابط إنستاجرام صحيح مثل: ?url=https://www.instagram.com/p/xyz",
-      });
+/* ------------------------- مسار GET ------------------------- */
+router.get("/", async (req, res) => {
+  const url = req.query.url;
+  if (!url)
+    return res.status(400).json({ status: false, message: "⚠️ يرجى إدخال رابط إنستاجرام" });
 
+  handleInstagram(url, res);
+});
+
+/* ------------------------- مسار POST ------------------------- */
+router.post("/", async (req, res) => {
+  const url = req.body.url;
+  if (!url)
+    return res.status(400).json({ status: false, message: "⚠️ يرجى إرسال رابط إنستاجرام في الجسم" });
+
+  handleInstagram(url, res);
+});
+
+/* ------------------------- دالة المعالجة ------------------------- */
+async function handleInstagram(url, res) {
+  try {
     const urlMatch = url.match(/https?:\/\/(www\.)?instagram\.com\/[^\s]+/i);
     if (!urlMatch)
       return res.status(400).json({ status: false, message: "✘︙ضع رابط إنستاجرام صحيح." });
@@ -77,7 +89,6 @@ router.all("/", async (req, res) => {
     const targetUrl = urlMatch[0];
     const cookieJar = {};
 
-   
     const homeRes = await axios.get("https://instag.com/", {
       headers: { ...COMMON_HEADERS, Referer: "https://www.google.com/" },
       timeout: 15000,
@@ -113,7 +124,6 @@ router.all("/", async (req, res) => {
     if (!managerRes.data)
       return res.status(500).json({ status: false, message: "⚠️ السيرفر رجع رد فاضي من /api/manager/" });
 
-   
     let jobId = null;
     const data = managerRes.data;
     if (typeof data === "object") {
@@ -124,18 +134,12 @@ router.all("/", async (req, res) => {
     }
 
     if (!jobId)
-      return res.status(500).json({
-        status: false,
-        message: "⚠️ لم أجد job_id",
-        raw: data,
-      });
+      return res.status(500).json({ status: false, message: "⚠️ لم أجد job_id", raw: data });
 
-   
     const resultData = await waitForResult(jobId, cookieJar, 15);
     if (!resultData)
       return res.status(408).json({ status: false, message: "⚠️ لم أجد نتيجة بعد الانتظار." });
 
-   ا
     let mediaUrl = null;
     if (resultData.html) {
       const $ = cheerio.load(resultData.html);
@@ -152,11 +156,7 @@ router.all("/", async (req, res) => {
     }
 
     if (!mediaUrl)
-      return res.status(404).json({
-        status: false,
-        message: "⚠️ لا يوجد رابط ميديا.",
-        raw: resultData,
-      });
+      return res.status(404).json({ status: false, message: "⚠️ لا يوجد رابط ميديا.", raw: resultData });
 
     const fileRes = await axios.get(mediaUrl, {
       responseType: "arraybuffer",
@@ -186,6 +186,6 @@ router.all("/", async (req, res) => {
       error: err?.message || err,
     });
   }
-});
+}
 
 export default router;
