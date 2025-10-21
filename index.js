@@ -9,6 +9,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import dotenv from 'dotenv';
 
+/* ❖ استيراد جميع المسارات (Routes) ❖ */
 import firebaseRoute from './routes/firebase.js';
 import tools_tr from './routes/tools-tr.js';
 import pinterest from './routes/download-pinterest.js';
@@ -34,6 +35,7 @@ import videogenerate from './routes/Ai_video-generate.js';
 import spotify from './routes/download_spotify.js';
 import spotify_dl from './routes/spotify_dl.js';
 import spot from './routes/spot.js';
+import sound_claude from './routes/sound-claude.js'; // ✅ تمت الإضافة هنا
 
 dotenv.config();
 
@@ -42,13 +44,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
+/* ❖ إعدادات الأمان والأداء ❖ */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(compression());
 app.use(xssClean());
 app.use(mongoSanitize());
-app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }));
-app.use(slowDown({ windowMs: 15*60*1000, delayAfter: 100, delayMs: 300 }));
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(slowDown({ windowMs: 15 * 60 * 1000, delayAfter: 100, delayMs: 300 }));
 
 app.use((req, res, next) => {
   res.setHeader("Content-Security-Policy",
@@ -62,11 +65,12 @@ app.use((req, res, next) => {
   );
   next();
 });
-/*❖❖❖*/
+
+/* ❖ مجلد الملفات العامة ❖ */
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
-/*❖❖❖*/
 
+/* ❖ تعريف المسارات ❖ */
 app.use('/api/tr', tools_tr);
 app.use('/api/pinterest', pinterest);
 app.use('/api/tiktok', tiktok);
@@ -92,30 +96,30 @@ app.use('/api/spotify', spotify);
 app.use('/api/spotify_dl', spotify_dl);
 app.use('/api/spot', spot);
 app.use('/api/firebase', firebaseRoute);
-/*❖❖❖*/
+app.use('/api/sound_claude', sound_claude); // ✅ إضافة الراوت الجديد هنا
 
+/* ❖ الصفحة الرئيسية ❖ */
 app.get('/', (req, res) => res.sendFile(path.join(publicDir, 'index.html')));
-/*❖❖❖*/
 
+/* ❖ صفحات داخلية ❖ */
 app.get('/pages/:page', (req, res, next) => {
   const pagePath = path.join(publicDir, 'pages', req.params.page, 'index.html');
   if (fs.existsSync(pagePath)) return res.sendFile(pagePath);
   next();
 });
-/*❖❖❖*/
 
+/* ❖ صفحة 404 ❖ */
 app.use((req, res) => {
   const notFoundPath = path.join(publicDir, '404.html');
   if (fs.existsSync(notFoundPath)) res.status(404).sendFile(notFoundPath);
   else res.status(404).send('404 - الصفحة غير موجودة 🚫');
 });
-/*❖❖❖*/
 
+/* ❖ معالجة الأخطاء ❖ */
 app.use((err, req, res, next) => {
   console.error('❌ Internal Error:', err.stack);
   res.status(500).json({ error: '🔥 Internal Server Error' });
 });
-/*❖❖❖*/
 
+/* ❖ تشغيل السيرفر ❖ */
 app.listen(port, () => console.log(`✅ Server running on http://localhost:${port}`));
-/*❖❖❖*/
