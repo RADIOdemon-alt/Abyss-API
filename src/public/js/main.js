@@ -12,7 +12,7 @@ function typeWriter(text, el, speed = 100) {
   }
   type();
 }
-typeWriter("✨ Welcome to DARK API ✨", document.getElementById("typewriter"), 80);
+typeWriter("WELCOME TO API PAGE", document.getElementById("typewriter"), 80);
 
 // ===== رسائل تنبيه =====
 const msgBox = document.getElementById("msgBox");
