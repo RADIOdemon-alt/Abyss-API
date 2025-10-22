@@ -29,6 +29,9 @@ app.get('/', (req, res) => {
     app.get('/page/download', (req, res) => {
     res.sendFile(pageDir("download"));
   });
+    app.get('/help', (req, res) => {
+    res.sendFile(pageDir("help"));
+  });
   
 };
 
