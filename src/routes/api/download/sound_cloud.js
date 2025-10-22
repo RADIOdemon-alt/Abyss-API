@@ -1,105 +1,76 @@
 import express from "express";
-import axios from "axios";
+import fetch from "node-fetch";
 import FormData from "form-data";
 
 const router = express.Router();
 
-/** 🎧 SoundCloud API Downloader */
-class SoundCloudAPI {
-  constructor() {
-    this.baseUrl = "https://scdler.com/wp-json/aio-dl/video-data/";
-    this.headers = {
+// 🔊 دالة تحميل الصوت من SoundCloud
+async function fetchSoundCloud(url) {
+  if (!url || !url.includes("soundcloud.com")) {
+    throw new Error("⚠️ الرابط غير صالح. أرسل رابط SoundCloud صحيح مع الباراميتر url.");
+  }
+
+  const form = new FormData();
+  form.append("url", url);
+  form.append("token", "");
+
+  const response = await fetch("https://scdler.com/wp-json/aio-dl/video-data/", {
+    method: "POST",
+    body: form,
+    headers: {
       "X-Requested-With": "XMLHttpRequest",
-      Referer: "https://scdler.com/ar/soundcloud-downloader/",
-      Origin: "https://scdler.com",
-      "User-Agent":
-        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-      Accept: "application/json",
-    };
+      "Referer": "https://scdler.com/ar/soundcloud-downloader/",
+      "Origin": "https://scdler.com",
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "application/json",
+    },
+  });
+
+  const json = await response.json();
+
+  if (!json || !json.medias || json.medias.length === 0) {
+    throw new Error("❌ فشل التحميل، لم يتم العثور على ملف صوت.");
   }
 
-  async download(url) {
-    if (!url || !url.includes("soundcloud.com")) {
-      throw new Error("رابط SoundCloud غير صالح");
-    }
-
-    const form = new FormData();
-    form.append("url", url);
-    form.append("token", "");
-
-    const response = await axios.post(this.baseUrl, form, {
-      headers: { ...this.headers, ...form.getHeaders() },
-    });
-
-    const data = response.data;
-    if (!data || !data.medias || data.medias.length === 0) {
-      throw new Error("لم يتم العثور على ملف صوت صالح");
-    }
-
-    const media = data.medias[0];
-    return {
-      title: data.title || "مقطع صوتي",
-      thumbnail: data.thumbnail || null,
-      quality: media.quality || "صوت",
-      size: media.size || "غير معروف",
-      audioUrl: media.url,
-    };
-  }
+  const media = json.medias[0];
+  return {
+    title: json.title || "مقطع صوتي",
+    quality: media.quality || "صوت",
+    size: media.size || "غير معروف",
+    audioUrl: media.url,
+    thumbnail: json.thumbnail || null,
+  };
 }
 
-/** 🧩 POST Route — تحميل صوت */
-router.post("/", async (req, res) => {
+// 🔹 GET 
+router.get("/", async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({
+    status: false,
+    message: "ارسل رابط ساوند كلاوند مع url=\nمثل\n\nhttps://dark-api-x.vercel.app/api/v1/download/sound_cloud?url=https://soundcloud.com/scythermane/funk-de-beleza-slowedbelezaslowed"
+  });
+
   try {
-    const { url } = req.body;
-    if (!url)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ الرابط مطلوب (url)",
-      });
-
-    const soundcloud = new SoundCloudAPI();
-    const result = await soundcloud.download(url);
-
-    res.json({
-      status: true,
-      message: "✅ تم جلب الصوت بنجاح من SoundCloud",
-      data: result,
-    });
+    const result = await fetchSoundCloud(url);
+    res.json({ status: true, ...result, message: "✅ تم العثور على الصوت بنجاح" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: false,
-      message: "❌ حدث خطأ أثناء تحميل الصوت من SoundCloud",
-      error: err.message,
-    });
+    res.status(500).json({ status: false, message: err.message });
   }
 });
 
-/** 🧩 GET Route — تحميل صوت عبر رابط مباشرة */
-router.get("/", async (req, res) => {
+// 🔹 POST 
+router.post("/", async (req, res) => {
+  const url = req.body.url;
+  if (!url) return res.status(400).json({
+    status: false,
+    message: "📌 أرسل رابط SoundCloud في body: { url: '...' }"
+  });
+
   try {
-    const url = req.query.url;
-    if (!url)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ الرابط مطلوب (url)",
-      });
-
-    const soundcloud = new SoundCloudAPI();
-    const result = await soundcloud.download(url);
-
-    res.json({
-      status: true,
-      message: "✅ تم جلب الصوت بنجاح من SoundCloud",
-      data: result,
-    });
+    const result = await fetchSoundCloud(url);
+    res.json({ status: true, ...result, message: "✅ تم العثور على الصوت بنجاح" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: false,
-      message: "❌ حدث خطأ أثناء تحميل الصوت من SoundCloud",
-      error: err.message,
-    });
+    res.status(500).json({ status: false, message: err.message });
   }
 });
 
