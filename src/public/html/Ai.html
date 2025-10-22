@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DARK API</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"/>
+</head>
+<body>
+
+  <div class="navbar"><span id="typewriter"> <span id="username"></span> </span></div>
+  <div id="toggleBtn"><i class="fa-solid fa-bars"></i></div>
+
+  <!-- ✅ القائمة الجانبية -->
+  <div id="sidebar">
+    <div id="sidebar-content">
+      <div>
+        <div class="logo">
+          <img src="logo.jpg" alt="Logo">
+        </div>
+        <h2>DARK API</h2>
+
+        <ul>
+          <li><a href="#"><i class="fa-solid fa-house"></i> Home</a></li>
+
+          <li class="dropdown">
+            <a href="#"><i class="fa-solid fa-plug"></i> APIs <i class="fa-solid fa-chevron-down"></i></a>
+            <ul class="submenu">
+              <li><a href="download.html"><i class="fa-solid fa-download"></i> Download</a></li>
+              <li><a href="search.html"><i class="fa-solid fa-magnifying-glass"></i> Search</a></li>
+              <li><a href="Ai.html"><i class="fa-solid fa-robot"></i> AI</a></li>
+              <li><a href="tools.html"><i class="fa-solid fa-screwdriver-wrench"></i> Tools</a></li>
+              <li><a href="#"><i class="fa-solid fa-question"></i> Soon</a></li>
+              <li><a href="#"><i class="fa-solid fa-question"></i> Soon</a></li>
+       </ul>
+          </li>
+
+          <li><a href="#"><i class="fa-solid fa-code"></i> Developers</a></li>
+          <li><a href="#"><i class="fa-solid fa-users"></i> Profile</a></li>
+          <li><a href="#"><i class="fa-solid fa-circle-question"></i> Help</a></li>
+          <li><a href="#"><i class="fa-solid fa-envelope"></i> Contact Us</a></li>
+        </ul>
+      </div>
+
+      <div class="logout">
+        <a href="#"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+      </div>
+    </div>
+  </div>
+  <!-- ✅ نهاية القائمة -->
+
+  <div class="api-container">
+    <!-- Cat Art -->
+    <div class="api-card">
+      <i class="fas fa-paw fa-3x"></i>
+      <h3>AI-CAT ART</h3>
+      <p>Create pictures now with CAT ART</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/ai/catart?prompt=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/ai/catart?prompt=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/105">Code</button>
+      </div>
+    </div>
+
+    <!-- Gemini -->
+    <div class="api-card">
+      <i class="fas fa-robot fa-3x"></i>
+      <h3>AI-GEMINI</h3>
+      <p>Chat now with a 100% original Gemini model</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/ai/gemini?prompt=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/ai/gemini?prompt=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/105">Code</button>
+      </div>
+    </div>
+
+    <!-- Deep Seek -->
+    <div class="api-card">
+      <i class="fas fa-mountain fa-3x"></i>
+      <h3>Deep-seek</h3>
+      <p>Image creation by model deep seek</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/ai/deep_img?prompt=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/ai/deep_img?prompt=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://wa.me/201234567890">Code</button>
+      </div>
+    </div>
+    
+    <!-- Pixel Art API Card -->
+<div class="api-card">
+  <div class="title">
+    <i class="fas fa-microphone"></i>
+    <h3>ElevenLabs TTS</h3>
+  </div>
+  <p>Convert your text to speech using selectable voices from ElevenLabs.</p>
+  <div class="buttons">
+    <!-- أزرار تجريبية لكل صوت -->
+  <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/ai/elevenlab?prompt=كيف+حالك&voice=ادم">Test</button>
+     
+    <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/ai/AI-elevenlabs">Copy </button>
+    <!-- زر عرض كود الإرسال عبر واتساب -->
+    <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/106">Code</button>
+  </div>
+</div>
+
+    <!-- Coming Soon -->
+    <div class="api-card coming-soon">
+      <h3>Coming Soon...</h3>
+      <ul>
+        <li>gpt-5</li>
+        <li>neno bnanna</li>
+        <li>fulx</li>
+        <li>to pixal</li>
+        <li>more</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="msgBox" class="msgBox"></div>
+  
+  <script type="module" src="../js/main.js"></script>
+</body>
+</html>
