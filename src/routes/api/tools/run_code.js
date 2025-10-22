@@ -1,4 +1,3 @@
-// file: routes/codetester.js
 import express from "express"
 import axios from "axios"
 import cheerio from "cheerio"
@@ -7,11 +6,14 @@ const router = express.Router()
 
 async function runCode(lang, code) {
   const allowedLangs = ["c", "cpp", "go", "java", "javascript", "python", "ruby"]
-  if (!allowedLangs.includes(lang)) throw new Error(`⚠️ اللغات المسموحة: ${allowedLangs.join(", ")}`)
+  if (!allowedLangs.includes(lang))
+    throw new Error(`⚠️ اللغات المسموحة: ${allowedLangs.join(", ")}`)
 
   const runnerUrl = "https://codetester.io/runner/"
   const runUrl = "https://codetester.io/assessment/run-code"
   const checkBase = "https://codetester.io/assessment/check-submission?token="
+
+  console.log("📡 [CodeTester] بدء الاتصال بالموقع...")
 
   // 🧠 استخراج CSRF
   const page = await axios.get(runnerUrl, { headers: { "User-Agent": "Mozilla/5.0" } })
@@ -23,16 +25,15 @@ async function runCode(lang, code) {
   const csrfToken = $('script:contains("csrfToken")')
     .html()
     ?.match(/csrfToken\s*=\s*"([^"]+)"/)?.[1]
+
   if (!csrfToken) throw new Error("❌ لم أستطع استخراج رمز CSRF.")
 
-  // 🚀 إرسال الكود
+  console.log("✅ تم استخراج رمز CSRF:", csrfToken.slice(0, 10) + "...")
+
+  // 🚀 إرسال الكود للتنفيذ
   const res = await axios.post(
     runUrl,
-    new URLSearchParams({
-      language: lang,
-      code: code,
-      input: "",
-    }),
+    new URLSearchParams({ language: lang, code, input: "" }),
     {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -55,9 +56,12 @@ async function runCode(lang, code) {
 
   if (!token) throw new Error("❌ لم أستطع تحديد رمز التحقق (token).")
 
+  console.log("🎯 رمز التنفيذ:", token)
+
   // ⏳ انتظار النتيجة
   const checkUrl = checkBase + token
   let output = ""
+
   for (let i = 0; i < 10; i++) {
     const checkRes = await axios.get(checkUrl, {
       headers: {
@@ -78,28 +82,36 @@ async function runCode(lang, code) {
   return output.replace(/^Stdout:\s*/, "").trim()
 }
 
-// 🔹 POST /api/code
+// 🧾 POST /api/code
 router.post("/", async (req, res) => {
   try {
     const { code, lang } = req.body
-    if (!code || !lang) return res.status(400).json({ status: false, message: "code و lang مطلوبان" })
+    if (!code || !lang)
+      return res.status(400).json({ status: false, message: "code و lang مطلوبان" })
 
+    console.log(`🧩 [POST] تشغيل كود ${lang}`)
     const output = await runCode(lang.toLowerCase(), code)
+    console.log("💬 النتيجة:\n" + output)
     res.json({ status: true, lang, output })
   } catch (e) {
+    console.error("❌ خطأ:", e.message)
     res.status(500).json({ status: false, message: e.message })
   }
 })
 
-// 🔹 GET /api/code?code=...&lang=...
+// 🧾 GET /api/code?code=...&lang=...
 router.get("/", async (req, res) => {
   try {
     const { code, lang } = req.query
-    if (!code || !lang) return res.status(400).json({ status: false, message: "code و lang مطلوبان" })
+    if (!code || !lang)
+      return res.status(400).json({ status: false, message: "code و lang مطلوبان" })
 
+    console.log(`🧩 [GET] تشغيل كود ${lang}`)
     const output = await runCode(lang.toLowerCase(), code)
+    console.log("💬 النتيجة:\n" + output)
     res.json({ status: true, lang, output })
   } catch (e) {
+    console.error("❌ خطأ:", e.message)
     res.status(500).json({ status: false, message: e.message })
   }
 })
