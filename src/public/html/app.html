@@ -38,8 +38,10 @@
       display:inline-block;
       border-right:2px solid #00aaff;
       white-space:nowrap;
+      position: fixed;
       overflow:hidden;
       width:0;
+      white-space: nowrap; 
       animation: typing 3.5s steps(30,end) forwards, blink 0.7s step-end infinite alternate;
     }
     @keyframes typing { from { width:0; } to { width:100%; } }
@@ -57,7 +59,7 @@
       transition:0.5s; z-index:1000; overflow-y:auto;
     }
     #sidebar.active { left:0; }
-    #sidebar::-webkit-scrollbar { width:5px; }
+    #sidebar::-webkit-scrollbar { width:0px; }
     #sidebar::-webkit-scrollbar-thumb { background:#00e0ff; border-radius:10px; }
     #sidebar::-webkit-scrollbar-track { background:#090A20; }
 
@@ -65,8 +67,7 @@
 
     .logo { width:90px; height:90px; border-radius:50%; margin:0 auto 15px; border:2px solid #00e0ff; overflow:hidden; }
     .logo img { width:100%; height:100%; object-fit:cover; }
-    #sidebar h2 { text-align:center; color:#00e0ff; font-size:24px; margin-bottom:25px; text-shadow:0 0 10px #00e0ff,0 0 25px #0077ff; }
-
+     #sidebar h2 { text-align:center; color:#00e0ff; font-size:24px; margin-bottom:25px; text-shadow:0 0 10px #00e0ff,0 0 25px #0077ff; }
     #sidebar ul { list-style:none; padding:0; }
     #sidebar ul li { position:relative; margin-bottom:12px; }
     #sidebar a {
@@ -115,16 +116,30 @@
     .whatsapp-btn:hover { box-shadow:0 0 25px rgba(37,211,102,1); }
     .whatsapp-btn .tooltip { position:absolute; bottom:60px; right:50%; transform:translateX(50%); background-color:#111; color:#fff; padding:5px 10px; border-radius:5px; font-size:13px; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity 0.3s ease, bottom 0.3s ease; }
     .whatsapp-btn:hover .tooltip { opacity:1; bottom:75px; }
-
+/* Fade-in for DARK API */
+#fadeInText {
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
+  color: #00e0ff;
+  text-shadow: 0 0 20px #00aaff, 0 0 40px #0077ff;
+  margin-left: 5px;
+}
+#fadeInText.visible {
+  opacity: 1;
+}
     /* Footer */
     .footer { background:#000; color:#888; text-align:center; padding:15px; font-size:0.85rem; border-top:1px solid #111; }
   </style>
 </head>
 <body>
 
-  <!-- Navbar -->
-  <div class="navbar"><span id="typingText">WELCOME TO DARK API</span></div>
 
+ 
+<!-- Navbar -->
+<div class="navbar">
+  <span id="typingText">WELCOME MY DEAR TO</span>
+  <span id="fadeInText"> DARK API</span>
+</div>
   <!-- Toggle Button -->
   <div id="toggleBtn"><i class="fa-solid fa-bars"></i></div>
 
@@ -203,67 +218,60 @@
     <p>© Dark API | Developed by Radio & Izana 💻</p>
   </footer>
 
-  <script>
-    // Navbar typing effect
-    const typingText = document.getElementById('typingText');
-    typingText.addEventListener('animationend', () => {
-      typingText.classList.add('done');
-    });
+ <script>
+ // Navbar typing effect
+const typingText = document.getElementById('typingText');
+const fadeInText = document.getElementById('fadeInText');
 
-    // Toggle sidebar
-    const toggleBtn = document.getElementById('toggleBtn');
-    const sidebar = document.getElementById('sidebar');
-    toggleBtn.addEventListener('click', () => {
-      sidebar.classList.toggle('active');
-      toggleBtn.innerHTML = sidebar.classList.contains('active')
-        ? '<i class="fa-solid fa-xmark"></i>'
-        : '<i class="fa-solid fa-bars"></i>';
-    });
+typingText.addEventListener('animationend', () => {
+  typingText.classList.add('done');
+  // بعد انتهاء typing يظهر DARK API
+  setTimeout(() => {
+    fadeInText.classList.add('visible');
+  }, 300); // تأخير صغير قبل الفيد إن
+});
 
-    // Dropdown menus
-    const dropdowns = document.querySelectorAll('.dropdown > a');
-    dropdowns.forEach(link => {
-      link.addEventListener('click', e => {
-        e.preventDefault();
-        const parent = link.parentElement;
-        parent.classList.toggle('active');
-        const icon = link.querySelector('.fa-chevron-down');
-        if (icon) icon.classList.toggle('rotate');
-        // Close others
-        dropdowns.forEach(other => {
-          if (other !== link) {
-            other.parentElement.classList.remove('active');
-            const otherIcon = other.querySelector('.fa-chevron-down');
-            if(otherIcon) otherIcon.classList.remove('rotate');
-          }
-        });
+  // Toggle sidebar
+  const toggleBtn = document.getElementById('toggleBtn');
+  const sidebar = document.getElementById('sidebar');
+  toggleBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('active');
+    toggleBtn.innerHTML = sidebar.classList.contains('active')
+      ? '<i class="fa-solid fa-xmark"></i>'
+      : '<i class="fa-solid fa-bars"></i>';
+  });
+
+  // Dropdown menus
+  const dropdowns = document.querySelectorAll('.dropdown > a');
+  dropdowns.forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const parent = link.parentElement;
+      parent.classList.toggle('active');
+      const icon = link.querySelector('.fa-chevron-down');
+      if (icon) icon.classList.toggle('rotate');
+      // Close others
+      dropdowns.forEach(other => {
+        if (other !== link) {
+          other.parentElement.classList.remove('active');
+          const otherIcon = other.querySelector('.fa-chevron-down');
+          if(otherIcon) otherIcon.classList.remove('rotate');
+        }
       });
     });
+  });
 
-    // Active link highlight
-    const links = document.querySelectorAll('#sidebar ul li a');
-    links.forEach(a => {
-      a.addEventListener('click', () => {
-        links.forEach(l => l.classList.remove('active'));
-        a.classList.add('active');
-      });
+  // Active link highlight
+  const links = document.querySelectorAll('#sidebar ul li a');
+  links.forEach(a => {
+    a.addEventListener('click', () => {
+      links.forEach(l => l.classList.remove('active'));
+      a.classList.add('active');
     });
+  });
 
-    // Service card click -> focused card
-    const serviceCards = document.querySelectorAll('.service-card');
-    const focusedCard = document.querySelector('.focused-card');
-    const backBtn = document.getElementById('backBtn');
-
-    serviceCards.forEach(card => {
-      card.addEventListener('click', () => {
-        focusedCard.querySelector('i').className = card.querySelector('i').className;
-        focusedCard.querySelector('h3').textContent = card.querySelector('h3').textContent;
-        focusedCard.querySelector('p').textContent = card.getAttribute('data-desc');
-        focusedCard.classList.add('active');
-      });
-    });
-
-    backBtn.addEventListener('click', () => focusedCard.classList.remove('active'));
-  </script>
+  // تم حذف الكود المسؤول عن فتح focused card
+  // الكاردات الآن لن تفتح أي بوبيت عند الضغط عليها
+</script>
 </body>
 </html>
