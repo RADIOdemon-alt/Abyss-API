@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dark API</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"/>
+<style>
+@import url('https://fonts.cdnfonts.com/css/source-code-pro');
+
+body {
+  font-family: 'Source Code Pro', monospace;
+  background-image: radial-gradient(ellipse at left, #2D193B, #090A20);
+  color: #00e0ff;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 50px auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 30px;
+}
+
+/* ===== Developer Card ===== */
+.dev-card {
+  background: rgba(0,0,0,0.6);
+  border-radius: 15px;
+  border: 2px solid #00e0ff33;
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 0 25px #00e0ff3f;
+  padding-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: 0.3s;
+}
+.dev-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 35px #00e0ff80;
+}
+.dev-card .avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid #00e0ff;
+  margin: 20px auto 10px; /* بدل -60px */
+  box-shadow: 0 0 15px #00e0ff;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dev-card .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.dev-card h2 {
+  color: #00e0ff;
+  margin: 10px 0 5px;
+  text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
+}
+.dev-card p {
+  color: #00e0ffaa;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.skill {
+  text-align: left;
+  margin: 10px 20px;
+}
+.skill span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+.progress-bar {
+  background: #220022;
+  border-radius: 10px;
+  overflow: hidden;
+  height: 10px;
+  margin-bottom: 10px;
+}
+.progress {
+  height: 100%;
+  background: linear-gradient(90deg,#00e0ff,#0077ff);
+  width: 0;
+  animation: fill 1.5s forwards;
+}
+@keyframes fill {
+  0% { width: 0; }
+  100% { width: var(--value); }
+}
+
+.dev-card .quote {
+  margin-top: 10px;
+  font-style: italic;
+  color: #ff80bf;
+  text-shadow: 0 0 6px #ff0099;
+}
+
+/* ===== WhatsApp Neon Button Style ===== */
+.wa-dropdown {
+  position: relative;
+  width: 230px;
+  margin: 15px auto;
+}
+
+.wa-btn.neon-green {
+  background: linear-gradient(135deg, #00ff99, #00cc66);
+  color: #000;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 15px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 0 15px #00ff99, 0 0 25px #00ff99 inset;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.wa-btn.neon-green:hover {
+  background: linear-gradient(135deg, #00cc66, #00ff99);
+  box-shadow: 0 0 25px #00ff99, 0 0 40px #00ff99 inset;
+  transform: translateY(-2px);
+}
+
+.wa-btn.neon-green i {
+  transition: transform 0.3s ease;
+}
+
+.wa-dropdown.active .wa-btn i.fas.fa-chevron-down {
+  transform: rotate(180deg);
+}
+
+/* ===== Submenu Animation ===== */
+.wa-submenu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  background: rgba(0,0,0,0.85);
+  border: 1px solid #00ff99;
+  border-radius: 10px;
+  box-shadow: 0 0 15px #00ff99;
+  transition: all 0.4s ease;
+}
+
+.wa-dropdown.active .wa-submenu {
+  max-height: 200px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.wa-submenu li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  color: #00ff99;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.wa-submenu li a:hover {
+  background: #00ff99;
+  color: #000;
+  box-shadow: inset 0 0 10px #00ff99;
+}
+
+/* ===== Headings ===== */
+h1, h2 {
+  text-align: center;
+  text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
+}
+
+h1 { margin-bottom: 40px; }
+h2 { margin-top: 40px; margin-bottom: 20px; }
+
+/* ===== FAQ ===== */
+section {
+  max-width: 800px;
+  margin: 60px auto;
+  padding: 0 20px;
+}
+
+.faq-item {
+  background: rgba(0,0,0,0.3);
+  margin-bottom: 12px;
+  border-left: 3px solid #00e0ff;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.faq-question {
+  cursor: pointer;
+  padding: 12px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.faq-question:hover {
+  background: rgba(0,224,255,0.1);
+}
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0 15px;
+  color: #9dfffa;
+  border-top: 1px solid rgba(0,224,255,0.2);
+  transition: all 0.4s ease;
+}
+
+.faq-item.active .faq-answer {
+  max-height: 150px;
+  opacity: 1;
+  padding: 12px 15px;
+}
+
+.faq-question i {
+  transition: transform 0.3s ease;
+}
+
+.faq-item.active .faq-question i {
+  transform: rotate(180deg);
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Radio Demon Card -->
+  <div class="dev-card">
+    <div class="avatar"><img src="https://files.catbox.moe/p0adsc.jpg" alt="Radio"></div>
+    <h2>Welcome, I am Radio Demon</h2>
+    <p>Front End Developer</p>
+
+    <div class="wa-dropdown">
+      <button class="wa-btn neon-green">
+        <span><i class="fab fa-whatsapp"></i> WhatsApp</span>
+        <i class="fas fa-chevron-down"></i>
+      </button>
+      <ul class="wa-submenu">
+        <li><a href="https://wa.me/201500564191" target="_blank"><i class="fab fa-whatsapp"></i> Chat</a></li>
+        <li><a href="https://whatsapp.com/channel/0029Vb6qkXM8V0tvdYh1fJ2g" target="_blank"><i class="fab fa-whatsapp"></i> Channel</a></li>
+      </ul>
+    </div>
+
+    <div class="skill">
+      <span>HTML 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>CSS 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>JS 90%</span><div class="progress-bar"><div class="progress" style="--value:90%"></div></div>
+      <span>Node 60%</span><div class="progress-bar"><div class="progress" style="--value:60%"></div></div>
+      <span>Express 40%</span><div class="progress-bar"><div class="progress" style="--value:40%"></div></div>
+      <span>React 25%</span><div class="progress-bar"><div class="progress" style="--value:25%"></div></div>
+    </div>
+
+    <div class="quote">Smile my dear… the world is dark, but your code can shine brighter than any demon’s soul!</div>
+  </div>
+
+  <!-- IZANA Card -->
+  <div class="dev-card">
+    <div class="avatar"><img src="https://files.catbox.moe/39y65n.jpg" alt="IZANA"></div>
+    <h2>I AM Atomic</h2>
+    <p>Back End Developer</p>
+
+    <div class="wa-dropdown">
+      <button class="wa-btn neon-green">
+        <span><i class="fab fa-whatsapp"></i> WhatsApp</span>
+        <i class="fas fa-chevron-down"></i>
+      </button>
+      <ul class="wa-submenu">
+        <li><a href="https://wa.me/201222784295" target="_blank"><i class="fab fa-whatsapp"></i> Chat</a></li>
+        <li><a href="https://whatsapp.com/channel/0029Vb8z64I0wak1S4EBQp1K" target="_blank"><i class="fab fa-whatsapp"></i> Channel</a></li>
+      </ul>
+    </div>
+
+    <div class="skill">
+      <span>Node JS 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>Axios 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>JS 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+    </div>
+
+    <div class="quote">I AM atomic</div>
+  </div>
+
+</div>
+
+<section>
+  <h2>❓ Frequently Asked Questions</h2>
+
+  <div class="faq-item">
+    <div class="faq-question">Is there a request limit per day? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Yes, free accounts have a limit. For unlimited access, you may need a premium plan.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-question">Do I need an API key? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Most endpoints require a valid API key. Make sure you include it in your request headers.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-question">How can I use the API? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Enter <a href="https://dark-api-x.vercel.app/" style="color:#00e0ff">home page</a> and choose what suits you from APIs.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-question">What if I get a 500 error? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Retry after a few seconds. If it persists, contact support.</div>
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('.wa-dropdown').forEach(drop => {
+  drop.querySelector('.wa-btn').addEventListener('click', () => {
+    drop.classList.toggle('active');
+  });
+});
+
+document.querySelectorAll('.faq-item').forEach(item => {
+  const question = item.querySelector('.faq-question');
+  question.addEventListener('click', () => {
+    item.classList.toggle('active');
+  });
+});
+</script>
+
+</body>
+</html>l
