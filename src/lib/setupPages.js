@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
     res.sendFile(pageDir("help"));
   });
     app.get('/contact_us', (req, res) => {
-    res.sendFile(pageDir("اContact_us"));
+    res.sendFile(pageDir("Contact_us"));
   });
     
 };
