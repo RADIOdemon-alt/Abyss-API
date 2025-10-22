@@ -23,6 +23,12 @@ app.get('/', (req, res) => {
     app.get('/page/tools', (req, res) => {
     res.sendFile(pageDir("tools"));
   });
+    app.get('/page/search', (req, res) => {
+    res.sendFile(pageDir("search"));
+  });
+    app.get('/page/download', (req, res) => {
+    res.sendFile(pageDir("download"));
+  });
   
 };
 
