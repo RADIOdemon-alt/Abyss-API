@@ -1,4 +1,3 @@
-// main.js — نسخة ذكية كاملة بدون Firebase
 
 // ===== تأثير الكتابة =====
 function typeWriter(text, el, speed = 100) {
@@ -13,7 +12,7 @@ function typeWriter(text, el, speed = 100) {
   }
   type();
 }
-typeWriter("Welcome to API PAGE", document.getElementById("typewriter"), 80);
+typeWriter("✨ Welcome to DARK API ✨", document.getElementById("typewriter"), 80);
 
 // ===== رسائل تنبيه =====
 const msgBox = document.getElementById("msgBox");
@@ -81,7 +80,15 @@ document.querySelectorAll(".test-btn").forEach(btn => {
     apiModal.style.display = "flex";
 
     // اكتشاف نوع البراميتر
-    currentParam = baseApi.match(/\?(prompt|url|image|img)=/i)?.[1] || "prompt";
+    currentParam = baseApi.match(/\?(prompt|url|image|img|imageUrl|imgUrl|lang)=/i)?.[1] || "prompt";
+
+    // إظهار/إخفاء حقل الإدخال لو currentParam هو lang
+    if (currentParam === "lang") {
+      userInput.style.display = "none";
+    } else {
+      userInput.style.display = "inline-block";
+    }
+
     updateHintText();
   });
 });
@@ -98,7 +105,12 @@ function updateHintText() {
       break;
     case "image":
     case "img":
+    case "imageUrl":
+    case "imgurl":
       msg = "🖼️ هذا النوع يقبل رابط صورة فقط. مثال: https://example.com/image.jpg";
+      break;
+    case "lang":
+      msg = "🌐 اختر اللغة فقط واضغط Get. لا تحتاج لإدخال رابط أو نص.";
       break;
     default:
       msg = "🧠 أدخل البيانات المناسبة حسب نوع الـ API.";
@@ -117,38 +129,30 @@ runTest.addEventListener("click", async () => {
   let input = userInput.value.trim();
 
   if (!base) return showMessage("⚠️ لا يوجد رابط API محدد.", "error");
-  if (!input) return showMessage("✏️ أدخل قيمة للاختبار.", "error");
 
-  // ✅ تحويل المسافات إلى +
-  input = input.replace(/\s+/g, "+");
+  // لو currentParam هو lang → لا نتحقق من النص أو الرابط
+  if (currentParam !== "lang" && !input) return showMessage("✏️ أدخل قيمة للاختبار.", "error");
 
-  // تحديد ما إذا كان الرابط يقبل URL أو نص
-  const isUrlParam = ["url", "image", "img"].includes(currentParam);
+  if (currentParam !== "lang") {
+    input = input.replace(/\s+/g, "+");
+    const isUrlParam = ["url", "image", "imageUrl", "imgurl"].includes(currentParam);
 
-  if (isUrlParam && !/^https?:\/\//.test(input))
-    return showMessage("🔗 يُسمح فقط بالروابط هنا", "error");
+    if (isUrlParam && !/^https?:\/\//.test(input))
+      return showMessage("🔗 يُسمح فقط بالروابط هنا", "error");
 
-  if (!isUrlParam && /^https?:\/\//.test(input))
-    return showMessage("✏️ يُسمح فقط بالنصوص هنا", "error");
+    if (!isUrlParam && /^https?:\/\//.test(input))
+      return showMessage("✏️ يُسمح فقط بالنصوص هنا", "error");
+  }
 
-  // ✅ ذكاء التعامل مع prompt أو غيره
   let fullUrl = base;
   const urlObj = new URL(base, window.location.origin);
-
-  // لو في prompt بالفعل → نبدله
   if (urlObj.searchParams.has(currentParam)) {
     urlObj.searchParams.set(currentParam, input);
     fullUrl = urlObj.toString();
   } else {
-    // لو مافيش بارامتر prompt نضيفه بشكل مناسب
-    if (base.includes("?")) {
-      fullUrl = `${base}&${currentParam}=${input}`;
-    } else {
-      fullUrl = `${base}?${currentParam}=${input}`;
-    }
+    fullUrl = base.includes("?") ? `${base}&${currentParam}=${input}` : `${base}?${currentParam}=${input}`;
   }
 
-  // ===== عرض الرابط وزر النسخ =====
   apiResult.innerHTML = `
     <div class="api-url-box">
       <code>${fullUrl}</code>
@@ -157,7 +161,6 @@ runTest.addEventListener("click", async () => {
     <br>⏳ جاري اختبار الـAPI...
   `;
 
-  // زر النسخ
   const copyBtn = apiResult.querySelector(".copy-url-btn");
   copyBtn.addEventListener("click", async () => {
     try {
@@ -178,21 +181,21 @@ runTest.addEventListener("click", async () => {
     const res = await fetch(fullUrl, { method: "GET" });
     const contentType = res.headers.get("content-type") || "";
 
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      throw new Error(`❌ الاستجابة ليست JSON:\n\n${text.slice(0, 200)}...`);
+    let data;
+    if (contentType.includes("application/json")) {
+      data = await res.json();
+    } else {
+      data = await res.text();
     }
 
-    const data = await res.json();
     setTimeout(() => {
       apiResult.innerHTML = `
         <div class="api-url-box">
           <code>${fullUrl}</code>
           <button class="copy-url-btn" title="نسخ الرابط">📋</button>
         </div>
-        <br><pre>${JSON.stringify(data, null, 2)}</pre>
+        <br><pre>${typeof data === "string" ? data : JSON.stringify(data, null, 2)}</pre>
       `;
-
       const copyBtn2 = apiResult.querySelector(".copy-url-btn");
       copyBtn2.addEventListener("click", async () => {
         try {
