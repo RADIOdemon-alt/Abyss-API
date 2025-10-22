@@ -1,0 +1,547 @@
+
+@import url('https://fonts.cdnfonts.com/css/source-code-pro');
+
+body {
+font-family: 'Source Code Pro', monospace;
+background-image: radial-gradient(ellipse at left, #2D193B, #090A20);
+color: #00e0ff;
+margin: 0;
+padding: 0;
+}
+
+/* Navbar */
+.navbar {
+background: radial-gradient(ellipse at left, #2D193B, #090A20);
+text-align: center;
+padding: 15px;
+font-size: 1.3rem;
+color: #00aaff;
+border-bottom: 1px solid #8B0000;
+box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+}
+
+/* الحاوية */
+.api-container {
+display: flex;
+justify-content: center;
+flex-wrap: wrap;
+padding: 40px;
+gap: 30px;
+}
+
+/* الكروت */
+.api-card {
+width: 300px;
+background: rgba(0, 0, 0, 0.7);
+border: 2px solid #00e0ff33;
+border-radius: 15px;
+text-align: center;
+padding: 20px;
+transition: 0.3s;
+box-shadow: 0 0 15px #00e0ff3f;
+}
+.api-card img {
+width: 100%;
+border-radius: 10px;
+margin-bottom: 15px;
+}
+.api-card h3 {
+color: #00e0ff;
+margin-bottom: 10px;
+}
+.api-card p {
+color: #00e0ffaa;
+font-size: 14px;
+}
+.api-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 0 25px #00e0ff80;
+}
+
+/* الأزرار */
+.buttons {
+display: flex;
+justify-content: center;
+gap: 10px;
+margin-top: 15px;
+}
+button {
+background: linear-gradient(90deg,#00e0ff,#0077ff);
+border: none;
+color: #000;
+padding: 8px 12px;
+border-radius: 8px;
+cursor: pointer;
+transition: 0.3s;
+font-weight: bold;
+}
+button:hover {
+background: linear-gradient(90deg,#0077ff,#00e0ff);
+transform: scale(1.05);
+}
+
+/* كارد قريباً */
+.coming-soon {
+color: #999;
+border: 2px dashed #00e0ff55;
+}
+.coming-soon h3 {
+color: #00e0ff;
+}
+.coming-soon ul {
+list-style: none;
+padding: 0;
+}
+
+/* الرسائل */
+.msgBox {
+position: fixed;
+top: 20px;
+left: 50%;
+transform: translateX(-50%);
+padding: 12px 20px;
+border-radius: 10px;
+background: rgba(0,0,0,0.9);
+color: #fff;
+border: 1px solid #00e0ff;
+text-shadow: 0 0 10px #00e0ff;
+display: none;
+z-index: 9999;
+}
+.msgBox.error {
+border-color: #ff0033;
+text-shadow: 0 0 10px #ff0033;
+}
+.msgBox.success {
+border-color: #00ff66;
+text-shadow: 0 0 10px #00ff66;
+}
+
+/* مودال */
+.api-modal {
+display: none;
+position: fixed;
+z-index: 9999;
+inset: 0;
+background: rgba(0, 0, 0, 0.8);
+backdrop-filter: blur(8px);
+justify-content: center;
+align-items: center;
+font-family: 'Poppins', sans-serif;
+}
+
+.api-modal-content {
+background: linear-gradient(145deg, #1a001a, #100010);
+border: 1px solid crimson;
+border-radius: 12px;
+padding: 20px;
+width: 80%;
+max-width: 700px;
+color: #fff;
+box-shadow: 0 0 25px crimson;
+text-align: left;
+position: relative;
+}
+
+.close-btn {
+position: absolute;
+top: 10px;
+right: 15px;
+color: crimson;
+font-size: 28px;
+cursor: pointer;
+transition: 0.2s;
+}
+.close-btn:hover { color: #ff4b4b; }
+
+.progress-bar {
+width: 100%;
+background: #220022;
+border-radius: 10px;
+margin: 15px 0;
+overflow: hidden;
+height: 10px;
+}
+.progress {
+width: 0%;
+height: 100%;
+background: crimson;
+animation: none;
+}
+@keyframes load {
+0% { width: 0%; }
+100% { width: 100%; }
+}
+
+#apiResult {
+background: #0a000a;
+border: 1px solid #400020;
+border-radius: 10px;
+padding: 15px;
+color: #ffb6c1;
+font-family: 'Source Code Pro', monospace;
+font-size: 14px;
+max-height: 400px;
+overflow-y: auto;
+}
+
+/* Sidebar */
+#sidebar {
+position: fixed;
+top: 0;
+left: 0;
+height: 100vh;
+font-family: 'Source Code Pro', monospace;
+display: flex;
+left: -300px;
+flex-direction: column;
+justify-content: space-between;
+z-index: 1000;
+overflow-y: auto;
+overflow-x: hidden;
+transition: all 0.7s ease;
+border-right: 2px solid rgba(0, 224, 255, 0.3);
+box-shadow: 0 0 25px #00e0ff4f;
+background-image: radial-gradient(ellipse at left, #2D193B, #090A20);
+scrollbar-width: thin;
+scrollbar-color: #00e0ff #090A20;
+}
+
+/* Scrollbar */
+#sidebar::-webkit-scrollbar {
+width: 0px;
+}
+#sidebar::-webkit-scrollbar-thumb {
+background: #00e0ff;
+border-radius: 10px;
+box-shadow: 0 0 10px #00e0ff;
+}
+#sidebar::-webkit-scrollbar-track {
+background: #090A20;
+}
+
+#sidebar.active {
+left: 0;
+}
+
+#sidebar-content {
+position: relative;
+z-index: 1;
+padding: 20px;
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+min-height: 100%;
+}
+
+/* Logo */
+.logo {
+width: 90px;
+height: 90px;
+border-radius: 50%;
+overflow: hidden;
+margin: 0 auto 15px;
+border: 2px solid #00e0ff;
+box-shadow: 0 0 15px #00e0ff;
+}
+.logo img {
+width: 100%;
+height: 100%;
+object-fit: cover;
+display: block;
+border-radius: 50%;
+filter: none;
+}
+
+#sidebar h2 {
+text-align: center;
+color: #00e0ff;
+font-size: 24px;
+text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
+margin-bottom: 25px;
+}
+
+/* القوائم */
+#sidebar ul {
+list-style: none;
+padding: 0;
+margin: 0;
+}
+#sidebar ul li {
+position: relative;
+margin-bottom: 12px;
+}
+#sidebar a {
+text-decoration: none;
+color: #fff;
+padding: 12px 15px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+border-radius: 8px;
+transition: 0.3s;
+position: relative;
+overflow: hidden;
+}
+#sidebar a i {
+margin-right: 10px;
+color: #00e0ff;
+transition: 0.3s;
+}
+#sidebar a:hover {
+color: #000;
+background: #00e0ff;
+box-shadow: 0 0 20px #00e0ff;
+}
+#sidebar a:hover i {
+color: #000;
+}
+
+/* المؤشر الأحمر */
+#sidebar a::before {
+content: "";
+position: absolute;
+left: 0;
+top: 0;
+width: 4px;
+height: 100%;
+background: linear-gradient(180deg, #ff0000, #ff003c, #ff0000);
+transform: scaleY(0);
+transform-origin: top;
+transition: transform 0.4s ease;
+border-radius: 2px;
+box-shadow: 0 0 10px #ff002b, 0 0 20px #ff002b;
+}
+#sidebar a:hover::before,
+#sidebar a.active::before {
+transform: scaleY(1);
+}
+
+/* Dropdown */
+.dropdown .submenu {
+display: none;
+padding-left: 20px;
+border-left: 2px solid #00e0ff33;
+animation: slideDown 0.3s ease;
+}
+.dropdown.active .submenu {
+display: block;
+}
+@keyframes slideDown {
+from { opacity: 0; transform: translateY(-5px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+/* زر القائمة */
+#toggleBtn {
+position: fixed;
+top: 6px;
+left: 10px;
+font-size: 28px;
+color: #00e0ff;
+cursor: pointer;
+z-index: 1100;
+transition: 0.3s;
+}
+#toggleBtn:hover {
+color: #00c8ff;
+transform: scale(1.1);
+}
+
+/* زر تسجيل الخروج */
+.logout a {
+background: linear-gradient(90deg, #8B0000, #8B0000);
+display: block;
+text-align: center;
+color: #fff;
+font-weight: bold;
+border-radius: 8px;
+padding: 12px;
+transition: 0.3s;
+}
+.logout a:hover {
+box-shadow: 0 0 20px #090A20;
+transform: scale(1.05);
+}
+
+/* العنصر النشط */
+#sidebar a.active {
+background: linear-gradient(90deg, #00e0ff, #0077ff);
+color: #090A20;
+box-shadow: 0 0 25px #090A20;
+}
+
+
+.fa-chevron-down.rotate {
+transform: rotate(180deg);
+transition: transform 0.3s ease;
+}
+
+.hint-btn {
+background: linear-gradient(135deg, #3a00ff, #7a00b8, #a00028);
+color: #fff;
+border: 1px solid rgba(255, 0, 60, 0.6);
+border-radius: 8px;
+padding: 6px 12px;
+font-size: 13px;
+cursor: pointer;
+transition: all 0.3s ease;
+position: relative;
+overflow: hidden;
+box-shadow: 0 0 10px rgba(160, 0, 40, 0.4), 0 0 20px rgba(122, 0, 184, 0.3);
+animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+.hint-btn::before {
+content: "";
+position: absolute;
+top: -50%;
+left: -50%;
+width: 200%;
+height: 200%;
+background: radial-gradient(circle, rgba(255,255,255,0.25), transparent 60%);
+opacity: 0;
+transition: opacity 0.3s;
+}
+
+.hint-btn:hover::before {
+opacity: 1;
+animation: spinGlow 1.5s linear infinite;
+}
+
+.hint-btn:hover {
+transform: scale(1.08);
+background: linear-gradient(135deg, #4a00ff, #9b00e0, #ff0048);
+box-shadow: 0 0 25px rgba(90, 0, 255, 0.9), 0 0 45px rgba(184, 0, 122, 0.8);
+}
+
+/* ✨ نصوص المساعدة */
+.hint {
+font-size: 14px;
+color: #e0baff;
+margin: 8px 0;
+text-shadow: 0 0 5px rgba(160, 0, 255, 0.6);
+}
+
+/* 🌌 خلفية المودال */
+.api-modal {
+position: fixed;
+inset: 0;
+display: none;
+justify-content: center;
+align-items: center;
+backdrop-filter: blur(5px);
+background: rgba(0, 0, 0, 0.8);
+z-index: 999;
+overflow-y: auto;
+padding: 40px 0;
+}
+
+/* 🪞صندوق المودال */
+.api-modal-content {
+background: radial-gradient(circle at top left, #1a0033, #0b0015);
+border: 1px solid #5c00b8;
+box-shadow: 0 0 25px rgba(80, 0, 255, 0.6), inset 0 0 20px rgba(255, 0, 90, 0.4);
+max-height: 90vh;
+overflow-y: auto;
+color: #fff;
+padding: 25px;
+border-radius: 12px;
+width: 320px;
+max-width: 90%;
+text-align: center;
+animation: fadeIn 0.5s ease, modalFlow 8s infinite alternate ease-in-out;
+}
+
+.api-modal-content input {
+width: 100%;
+padding: 8px;
+margin: 8px 0;
+border: none;
+border-radius: 8px;
+font-size: 15px;
+background: rgba(255,255,255,0.1);
+color: #fff;
+outline: 1px solid rgba(122, 0, 255, 0.3);
+transition: all 0.2s ease;
+}
+
+.api-modal-content input:focus {
+outline: 1px solid #a00028;
+box-shadow: 0 0 10px rgba(160, 0, 40, 0.7);
+transform: scale(1.02);
+}
+
+/* 🔘 زر داخل المودال */
+.api-modal-content button {
+background: linear-gradient(135deg, #3a00ff, #7a00b8, #a00028);
+color: white;
+border: none;
+padding: 8px 16px;
+border-radius: 8px;
+cursor: pointer;
+margin-top: 8px;
+transition: all 0.3s ease;
+box-shadow: 0 0 10px rgba(160, 0, 40, 0.4);
+animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+.api-modal-content button:hover {
+transform: scale(1.08) rotate(-1deg);
+background: linear-gradient(135deg, #4a00ff, #a000ff, #ff0048);
+box-shadow: 0 0 25px rgba(122, 0, 255, 0.8), 0 0 40px rgba(255, 0, 80, 0.7);
+}
+
+/* 🔄 التحميل */
+.progress-bar {
+height: 5px;
+background: rgba(255,255,255,0.1);
+margin-top: 10px;
+border-radius: 5px;
+overflow: hidden;
+animation: fadeIn 1s ease;
+}
+
+.progress {
+height: 100%;
+width: 0;
+background: linear-gradient(90deg, #3a00ff, #7a00b8, #a00028);
+transition: width 2s linear;
+animation: gradientShift 4s infinite alternate;
+}
+
+/* ✨ نصوص جانبية */
+.inline-text {
+margin-left: 8px;
+color: #9d5fff;
+font-weight: bold;
+font-family: monospace;
+text-shadow: 0 0 6px #a00028;
+}
+
+/* 🎬 الأنيميشنات */
+@keyframes fadeIn {
+from { opacity: 0; transform: scale(0.9); }
+to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spinGlow {
+from { transform: rotate(0deg); }
+to { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+0%, 100% { box-shadow: 0 0 10px rgba(120, 0, 255, 0.4), 0 0 20px rgba(255, 0, 90, 0.3); }
+50% { box-shadow: 0 0 25px rgba(90, 0, 255, 0.8), 0 0 40px rgba(255, 0, 80, 0.6); }
+}
+
+@keyframes modalFlow {
+0% { background-position: 0% 50%; }
+100% { background-position: 100% 50%; }
+}
+
+@keyframes gradientShift {
+0% { background-position: 0% 50%; }
+100% { background-position: 100% 50%; }
+}
+
