@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DARK API</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"/>
+</head>
+<body>
+
+  <div class="navbar"><span id="typewriter"> <span id="username"></span> </span></div>
+  <div id="toggleBtn"><i class="fa-solid fa-bars"></i></div>
+
+  <!-- ✅ القائمة الجانبية -->
+  <div id="sidebar">
+    <div id="sidebar-content">
+      <div>
+        <div class="logo">
+          <img src="https://files.catbox.moe/rx2tvh.jpg" alt="Logo">
+        </div>
+        <h2>DARK API</h2>
+
+        <ul>
+          <li><a href="#"><i class="fa-solid fa-house"></i> Home</a></li>
+          <li class="dropdown">
+            <a href="#"><i class="fa-solid fa-plug"></i> APIs <i class="fa-solid fa-chevron-down"></i></a>
+            <ul class="submenu">
+              <li><a href="https://dark-api-x.vercel.app/page/download"><i class="fa-solid fa-download"></i> Download</a></li>
+              <li><a href="https://dark-api-x.vercel.app/page/search"><i class="fa-solid fa-magnifying-glass"></i> Search</a></li>
+              <li><a href="https://dark-api-x.vercel.app/page/Ai"><i class="fa-solid fa-robot"></i> AI</a></li>
+              <li><a href="https://dark-api-x.vercel.app/page/tools"><i class="fa-solid fa-screwdriver-wrench"></i> Tools</a></li>
+              <li><a href="#"><i class="fa-solid fa-question"></i> Soon</a></li>
+              <li><a href="#"><i class="fa-solid fa-question"></i> Soon</a></li>
+            </ul>
+          </li>
+          <li><a href="#"><i class="fa-solid fa-code"></i> Developers</a></li>
+          <li><a href="#"><i class="fa-solid fa-users"></i> Profile</a></li>
+          <li><a href="#"><i class="fa-solid fa-circle-question"></i> Help</a></li>
+          <li><a href="#"><i class="fa-solid fa-envelope"></i> Contact Us</a></li>
+        </ul>
+      </div>
+
+      <div class="logout">
+        <a href="#"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+      </div>
+    </div>
+  </div>
+  <!-- ✅ نهاية القائمة -->
+
+  <div class="api-container">
+    <!-- Anti-Porn API -->
+    <div class="api-card">
+      <i class="fab fa-github fa-3x"></i>
+      <h3>search github</h3>
+      <p>Search for any repo you want through GitHub </p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/github?text=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/search/github?text=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/105">Code</button>
+      </div>
+    </div>
+    
+    <div class="api-card">
+      <i class="fas fa-globe fa-3x"></i>
+      <h3>search Wikipedia</h3>
+      <p>Find the latest world news by Wikipedia</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/wiki?text=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/search/wiki?text=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/105">Code</button>
+      </div>
+    </div>
+
+    <!-- TikTok Tools -->
+    <div class="api-card">
+      <i class="fab fa-tiktok fa-3x"></i>
+      <h3>TikTok search</h3>
+      <p>Download and search TikTok videos instantly.</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/tiktok?query=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/search/tiktok?query=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/105">Code</button>
+      </div>
+    </div>
+
+    <!-- Pinterest -->
+    <div class="api-card">
+      <i class="fab fa-pinterest fa-3x"></i>
+      <h3>Pinterest img search</h3>
+      <p>Download img from Pinterest.</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/pinterest?query=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-one.vercel.app/api/v1/search/pinterest?query=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/102">Code</button>
+      </div>
+    </div>
+    
+    <div class="api-card">
+      <i class="fab fa-pinterest fa-3x"></i>
+      <h3>Pinterest video search</h3>
+      <p>Download video from Pinterest.</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/pinterest_video?query=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-one.vercel.app/api/v1/search/pinterest_video?query=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/102">Code</button>
+      </div>
+    </div>
+
+    <!-- Image to Anime -->
+    <div class="api-card">
+      <i class="fab fa-soundcloud fa-3x"></i>
+      <h3>search sound_cloude</h3>
+      <p>search for your favorite songs on SoundCloud</p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/sound_cloud?query=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/search/sound_cloud?query=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/106">Code</button>
+      </div>
+    </div>
+
+    <!-- Text to Voice Characters -->
+      <div class="api-card">
+      <i class="fas fa-music fa-3x"></i>
+      <h3>search lyrics</h3>
+      <p>search for your lyrics of your favorite song </p>
+      <div class="buttons">
+        <button class="test-btn" data-link="https://dark-api-x.vercel.app/api/v1/search/lyrics?text=">Test</button>
+        <button class="copy-btn" data-copy="https://dark-api-x.vercel.app/api/v1/search/lyrics?text=">Copy</button>
+        <button class="code-btn" data-whatsapp="https://whatsapp.com/channel/0029VbB2Uwg11ulIMA9bfq2c/103">Code</button>
+      </div>
+    </div>
+
+    <!-- Coming Soon -->
+    <div class="api-card coming-soon">
+      <h3>Coming Soon...</h3>
+      <ul>
+        <li>More</li>         
+      </ul>
+    </div>
+  </div>
+
+  <div id="msgBox" class="msgBox"></div>
+  <script type="module" src="../js/main.js"></script>
+</body>
+                </html>
