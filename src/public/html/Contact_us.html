@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact Us - WhatsApp</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"/>
+<style>
+@import url('https://fonts.cdnfonts.com/css/source-code-pro');
+body {
+  font-family: 'Source Code Pro', monospace;
+  background-image: radial-gradient(ellipse at left, #2D193B, #090A20);
+  color: #00e0ff;
+  margin: 0;
+  padding: 0;
+}
+.container {
+  max-width: 600px;
+  margin: 60px auto;
+  padding: 30px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 15px;
+  border: 2px solid #00e0ff33;
+  box-shadow: 0 0 25px #00e0ff3f;
+}
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
+}
+label { display: block; margin-bottom: 6px; font-weight: bold; color: #00e0ff; }
+input, textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 20px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  outline: 1px solid rgba(0,224,255,0.3);
+  transition: all 0.3s ease;
+}
+input:focus, textarea:focus {
+  outline: 1px solid #00e0ff;
+  box-shadow: 0 0 10px #00e0ff;
+  transform: scale(1.02);
+}
+button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #000;
+  background: linear-gradient(135deg, #3a00ff, #7a00b8, #a00028);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 15px rgba(160, 0, 40, 0.5), 0 0 25px rgba(122, 0, 184, 0.5);
+}
+button:hover {
+  transform: scale(1.05) rotate(-1deg);
+  background: linear-gradient(135deg, #4a00ff, #a000ff, #ff0048);
+  box-shadow: 0 0 25px rgba(122,0,255,0.7), 0 0 40px rgba(255,0,80,0.6);
+}
+.msgBox {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.9);
+  color: #fff;
+  border: 1px solid #00e0ff;
+  text-shadow: 0 0 10px #00e0ff;
+  display: none;
+  z-index: 9999;
+}
+.msgBox.error { border-color: #ff0033; text-shadow: 0 0 10px #ff0033; }
+.msgBox.success { border-color: #00ff66; text-shadow: 0 0 10px #00ff66; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📨 Contact Us</h1>
+  <form id="contactForm">
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name" placeholder="Your Name" required>
+
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" placeholder="Your Email" required>
+
+    <label for="phone">Phone Number:</label>
+    <input type="tel" id="phone" name="phone" placeholder="Your Phone">
+
+    <label for="message">Message:</label>
+    <textarea id="message" name="message" rows="5" placeholder="Your Message" required></textarea>
+
+    <button type="submit">Send via WhatsApp</button>
+  </form>
+</div>
+
+<div class="msgBox" id="msgBox"></div>
+
+<script>
+const form = document.getElementById('contactForm');
+const msgBox = document.getElementById('msgBox');
+const whatsappNumber = '201500564191'; // رقم الواتساب
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+
+  const name = encodeURIComponent(form.name.value);
+  const email = encodeURIComponent(form.email.value);
+  const phone = encodeURIComponent(form.phone.value || '—');
+  const message = encodeURIComponent(form.message.value);
+
+  // صياغة الرسالة المزخرفة
+  const text = `✨ رقم: ${phone}\n✨ الإيميل: ${email}\n✨ الاسم: ${name}\n✨ الرسالة: ${message}`;
+
+  // رابط WhatsApp API
+  const url = `https://wa.me/${whatsappNumber}?text=${text}`;
+
+  // فتح WhatsApp Web أو App
+  window.open(url, '_blank');
+
+  // إظهار رسالة نجاح
+  msgBox.textContent = "✅ Opening WhatsApp...";
+  msgBox.className = "msgBox success";
+  msgBox.style.display = "block";
+
+  setTimeout(() => { msgBox.style.display = "none"; }, 4000);
+});
+</script>
+
+</body>
+</html>
