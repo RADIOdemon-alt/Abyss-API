@@ -17,6 +17,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/', (req, res) => {
     res.sendFile(pageDir("app"));
   });
+    app.get('/page/Ai', (req, res) => {
+    res.sendFile(pageDir("Ai"));
+  });
   
 };
 
