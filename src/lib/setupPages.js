@@ -35,6 +35,9 @@ app.get('/', (req, res) => {
     app.get('/contact_us', (req, res) => {
     res.sendFile(pageDir("Contact_us"));
   });
+    app.get('/developers', (req, res) => {
+    res.sendFile(pageDir("Developers"));
+  });
     
 };
 
