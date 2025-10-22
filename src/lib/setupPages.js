@@ -20,6 +20,9 @@ app.get('/', (req, res) => {
     app.get('/page/Ai', (req, res) => {
     res.sendFile(pageDir("Ai"));
   });
+    app.get('/page/tools', (req, res) => {
+    res.sendFile(pageDir("tools"));
+  });
   
 };
 
