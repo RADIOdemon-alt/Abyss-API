@@ -37,17 +37,22 @@ class SpotifyAPI {
       throw new Error('❌ لم يتم العثور على المسار');
     }
 
+    // ✅ إرجاع كائن Track الكامل كما يأتي من API
     return response.data.tracks[0];
   }
 
   async downloadTrack(track) {
+    // ✅ نفس الـ payload الموجود في الكود الأصلي
     const payload = {
-      track,
+      track,  // كائن Track كامل
       download_dir: "downloads",
       filename_tag: "SPOTISAVER",
       user_ip: "2404:c0:9830::800e:2a9c",
       is_premium: false
     };
+
+    console.log("📤 إرسال طلب التنزيل...");
+    console.log("📦 Payload:", JSON.stringify(payload, null, 2));
 
     const response = await axios.post(
       "https://spotisaver.net/api/download_track.php",
@@ -64,10 +69,18 @@ class SpotifyAPI {
     );
 
     if (response.data.length < 1000) {
+      console.warn("⚠️ حجم الملف صغير جداً");
+      const errorText = Buffer.from(response.data).toString('utf8').substring(0, 500);
+      console.log("محتوى الرد:", errorText);
       throw new Error('❌ حجم الملف صغير جداً - قد يكون هناك خطأ');
     }
 
+    console.log("✅ تم تنزيل المسار بنجاح، الحجم:", response.data.length, "بايت");
     return Buffer.from(response.data);
+  }
+
+  cleanFileName(name = 'track') {
+    return name.replace(/[\\/:"'*?<>|]+/g, '').replace(/\s+/g, '_').slice(0, 150);
   }
 }
 
@@ -82,27 +95,50 @@ router.post("/", async (req, res) => {
       });
     }
 
+    console.log("🔗 الرابط المستلم:", url);
+
     const spotify = new SpotifyAPI();
     
     // استخراج Track ID
     const trackId = spotify.parseSpotifyUrl(url);
+    console.log("✅ تم العثور على Track ID:", trackId);
     
-    // الحصول على معلومات المسار
+    // الحصول على معلومات المسار الكاملة
     const track = await spotify.getTrackInfo(trackId);
+    console.log("🎯 المسار المحدد:", track.name);
+    console.log("🎵 الفنان:", track.artists?.map(a => a.name).join(', '));
     
-    // تنزيل المسار
+    // تنزيل المسار (مع إرسال كائن Track الكامل)
     const audioBuffer = await spotify.downloadTrack(track);
     
     // إرسال الملف
+    const filename = `${spotify.cleanFileName(track.name || `track-${track.id}`)}.mp3`;
+    
     res.set({
       'Content-Type': 'audio/mpeg',
-      'Content-Disposition': `attachment; filename="${track.name.replace(/[^\w\s-]/g, '')}.mp3"`
+      'Content-Disposition': `attachment; filename="${filename}"`
     });
     
     res.send(audioBuffer);
 
   } catch (err) {
-    console.error("Spotify Error:", err.message);
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.error("❌ خطأ في Spotify:");
+    console.error("الرسالة:", err.message);
+    console.error("النوع:", err.name);
+    
+    if (err.response) {
+      console.error("📡 رد الخادم:");
+      console.error("Status:", err.response.status);
+      try {
+        const errorText = Buffer.from(err.response.data).toString('utf8');
+        console.error("رد الخطأ:", errorText);
+      } catch (e) {
+        console.error("Data:", err.response.data);
+      }
+    }
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
     res.status(500).json({ 
       status: false, 
       message: "❌ حدث خطأ أثناء تنزيل المسار", 
@@ -123,27 +159,50 @@ router.get("/", async (req, res) => {
       });
     }
 
+    console.log("🔗 الرابط المستلم:", url);
+
     const spotify = new SpotifyAPI();
     
     // استخراج Track ID
     const trackId = spotify.parseSpotifyUrl(url);
+    console.log("✅ تم العثور على Track ID:", trackId);
     
-    // الحصول على معلومات المسار
+    // الحصول على معلومات المسار الكاملة
     const track = await spotify.getTrackInfo(trackId);
+    console.log("🎯 المسار المحدد:", track.name);
+    console.log("🎵 الفنان:", track.artists?.map(a => a.name).join(', '));
     
-    // تنزيل المسار
+    // تنزيل المسار (مع إرسال كائن Track الكامل)
     const audioBuffer = await spotify.downloadTrack(track);
     
     // إرسال الملف
+    const filename = `${spotify.cleanFileName(track.name || `track-${track.id}`)}.mp3`;
+    
     res.set({
       'Content-Type': 'audio/mpeg',
-      'Content-Disposition': `attachment; filename="${track.name.replace(/[^\w\s-]/g, '')}.mp3"`
+      'Content-Disposition': `attachment; filename="${filename}"`
     });
     
     res.send(audioBuffer);
 
   } catch (err) {
-    console.error("Spotify Error:", err.message);
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.error("❌ خطأ في Spotify:");
+    console.error("الرسالة:", err.message);
+    console.error("النوع:", err.name);
+    
+    if (err.response) {
+      console.error("📡 رد الخادم:");
+      console.error("Status:", err.response.status);
+      try {
+        const errorText = Buffer.from(err.response.data).toString('utf8');
+        console.error("رد الخطأ:", errorText);
+      } catch (e) {
+        console.error("Data:", err.response.data);
+      }
+    }
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
     res.status(500).json({ 
       status: false, 
       message: "❌ حدث خطأ أثناء تنزيل المسار", 
