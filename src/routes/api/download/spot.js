@@ -5,207 +5,151 @@ const router = express.Router();
 
 class SpotifyAPI {
   constructor() {
-    this.base = "https://spotisaver.net";
     this.headers = {
-      "User-Agent":
-        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
-      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+      "Accept": "application/json"
     };
   }
 
-  parseUrl(input) {
-    if (!input) throw new Error("⚠️ رابط Spotify مفقود");
-    const url = input.trim();
-
-    console.log("🔍 تحليل الرابط:", url);
-
-    if (url.includes("spotify.link")) {
-      throw new Error(
-        "⚠️ الروابط المختصرة (spotify.link) غير مدعومة حالياً. استخدم open.spotify.com"
-      );
+  parseSpotifyUrl(url) {
+    if (url.includes('spotify.link')) {
+      throw new Error('⚠️ الروابط المختصرة غير مدعومة. استخدم open.spotify.com');
     }
 
     const trackMatch = url.match(/\/track\/([a-zA-Z0-9]+)/);
-    if (trackMatch) {
-      const id = trackMatch[1];
-      console.log("✅ Track ID:", id);
-      return { id, type: "track", referer: `${this.base}/en/track/${id}/` };
+    if (!trackMatch) {
+      throw new Error('❌ رابط Spotify غير صالح! استخدم رابط Track فقط');
     }
 
-    const playlistMatch = url.match(/\/playlist\/([a-zA-Z0-9]+)/);
-    if (playlistMatch) {
-      const id = playlistMatch[1];
-      console.log("✅ Playlist ID:", id);
-      return { id, type: "playlist", referer: `${this.base}/en/playlist/${id}/` };
-    }
-
-    const albumMatch = url.match(/\/album\/([a-zA-Z0-9]+)/);
-    if (albumMatch) {
-      const id = albumMatch[1];
-      console.log("✅ Album ID (treated as playlist):", id);
-      return { id, type: "playlist", referer: `${this.base}/en/playlist/${id}/` };
-    }
-
-    throw new Error(
-      "❌ رابط Spotify غير صالح. الروابط المدعومة: /track/, /playlist/, /album/"
-    );
+    return trackMatch[1];
   }
 
-  async getInfo(url) {
-    console.log("🔄 جلب معلومات من spotisaver...");
-    const { id, type, referer } = this.parseUrl(url);
-    const apiUrl = `${this.base}/api/get_playlist.php?id=${id}&type=${type}&lang=en`;
-    console.log("📡 API URL:", apiUrl);
-    try {
-      const res = await axios.get(apiUrl, {
-        headers: { ...this.headers, Referer: referer },
-        timeout: 20000,
-      });
+  async getTrackInfo(trackId) {
+    const apiUrl = `https://spotisaver.net/api/get_playlist.php?id=${trackId}&type=track&lang=en`;
+    const referer = `https://spotisaver.net/en/track/${trackId}/`;
 
-      console.log("📥 status:", res.status);
-      // console.log("📊 data:", JSON.stringify(res.data, null, 2));
+    const response = await axios.get(apiUrl, {
+      headers: { ...this.headers, Referer: referer },
+      timeout: 20000
+    });
 
-      if (!res.data || res.data.error) {
-        throw new Error(res.data?.error || "فشل الحصول على بيانات من spotisaver");
-      }
-
-      const tracks = res.data.tracks || [];
-      if (!tracks.length) throw new Error("لم يتم العثور على مسارات في الرابط.");
-
-      console.log("✅ عدد المسارات:", tracks.length);
-      return { tracks, type, id };
-    } catch (err) {
-      if (err.response) {
-        console.error("❌ خطأ من API:", err.response.status);
-        try {
-          console.error("Data:", JSON.stringify(err.response.data));
-        } catch (e) {}
-        // تعامُل خاص بحالة 403
-        if (err.response.status === 403) {
-          throw new Error("Forbidden (403) — قد تمنع Spotisaver طلبك (تحتاج Headers أو Proxy).");
-        }
-      }
-      throw err;
+    if (response.data.error || !response.data.tracks?.[0]) {
+      throw new Error('❌ لم يتم العثور على المسار');
     }
+
+    return response.data.tracks[0];
   }
 
   async downloadTrack(track) {
-    if (!track || !track.id) throw new Error("معلومات المسار ناقصة.");
-    console.log("🔄 طلب تنزيل المسار:", track.name || track.id);
-
     const payload = {
       track,
       download_dir: "downloads",
       filename_tag: "SPOTISAVER",
       user_ip: "2404:c0:9830::800e:2a9c",
-      is_premium: false,
+      is_premium: false
     };
 
-    try {
-      const res = await axios.post(
-        `${this.base}/api/download_track.php`,
-        payload,
-        {
-          headers: {
-            ...this.headers,
-            Referer: `https://spotisaver.net/en/track/${track.id}/`,
-            "Content-Type": "application/json",
-          },
-          responseType: "arraybuffer",
-          timeout: 60000,
-        }
-      );
-
-      console.log("📥 تنزيل: حجم البيانات =", res.data?.byteLength ?? res.data?.length ?? 0);
-
-      const buf = Buffer.from(res.data);
-      if (!buf || buf.length === 0) throw new Error("تم تنزيل ملف فارغ.");
-      if (buf.length < 1000) {
-        console.warn("⚠️ حجم الملف صغير جداً؛ قد يكون خطأ. معاينة أولية:");
-        console.warn(buf.toString("utf8", 0, 500));
-        throw new Error("الملف صغير جداً بعد التنزيل - قد يكون هناك حظر أو رد خطأ.");
+    const response = await axios.post(
+      "https://spotisaver.net/api/download_track.php",
+      payload,
+      {
+        headers: {
+          ...this.headers,
+          Referer: `https://spotisaver.net/en/track/${track.id}/`,
+          'Content-Type': 'application/json'
+        },
+        responseType: "arraybuffer",
+        timeout: 60000
       }
+    );
 
-      return buf;
-    } catch (err) {
-      if (err.response) {
-        console.error("❌ رد خطأ من خدمة التنزيل:", err.response.status);
-        try {
-          const txt = Buffer.from(err.response.data || "").toString("utf8");
-          console.error("رد نصي:", txt.substring(0, 1000));
-        } catch (e) {}
-        if (err.response.status === 403) {
-          throw new Error("Forbidden (403) أثناء محاولة تنزيل الملف — Spotisaver رفض الطلب.");
-        }
-      }
-      throw err;
+    if (response.data.length < 1000) {
+      throw new Error('❌ حجم الملف صغير جداً - قد يكون هناك خطأ');
     }
+
+    return Buffer.from(response.data);
   }
 }
 
-/** مسارات router */
-
-/** POST: body = { url: "...", index: 1 } */
-/** POST: body = { url: "...", index: 1 } */
+/** 🎵 POST Route */
 router.post("/", async (req, res) => {
   try {
-    const { url, index = 1 } = req.body;
-    if (!url) return res.status(400).json({ status: false, error: "يرجى إدخال رابط Spotify." });
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ 
+        status: false, 
+        message: "⚠️ رابط Spotify مطلوب (url)" 
+      });
+    }
 
     const spotify = new SpotifyAPI();
-    const { tracks, type } = await spotify.getInfo(url);
-
-    const i = Number.isFinite(Number(index)) ? parseInt(index) - 1 : 0;
-    const track = tracks[i] || tracks[0];
-
-    const buffer = await spotify.downloadTrack(track);
-
-    res.json({
-      status: true,
-      creator: "Dark-Team",
-      data: {
-        id: track.id,
-        name: track.name,
-        artists: track.artists?.map(a => a.name) || [],
-        type: type === "track" ? "audio" : "playlist",
-        duration: track.duration_ms,
-        download: buffer.toString("base64")
-      }
+    
+    // استخراج Track ID
+    const trackId = spotify.parseSpotifyUrl(url);
+    
+    // الحصول على معلومات المسار
+    const track = await spotify.getTrackInfo(trackId);
+    
+    // تنزيل المسار
+    const audioBuffer = await spotify.downloadTrack(track);
+    
+    // إرسال الملف
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Disposition': `attachment; filename="${track.name.replace(/[^\w\s-]/g, '')}.mp3"`
     });
+    
+    res.send(audioBuffer);
+
   } catch (err) {
-    res.status(500).json({ status: false, error: err.message });
+    console.error("Spotify Error:", err.message);
+    res.status(500).json({ 
+      status: false, 
+      message: "❌ حدث خطأ أثناء تنزيل المسار", 
+      error: err.message 
+    });
   }
 });
-// GET: ?url=...&index=1 
+
+/** 🎵 GET Route */
 router.get("/", async (req, res) => {
   try {
-    const { url, index = 1 } = req.query;
-    if (!url) return res.status(400).json({ status: false, error: "يرجى إدخال رابط Spotify." });
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).json({ 
+        status: false, 
+        message: "⚠️ رابط Spotify مطلوب (url)",
+        example: "?url=https://open.spotify.com/track/xxxxx"
+      });
+    }
 
     const spotify = new SpotifyAPI();
-    const { tracks, type } = await spotify.getInfo(url);
-
-    const i = Number.isFinite(Number(index)) ? parseInt(index) - 1 : 0;
-    const track = tracks[i] || tracks[0];
-
-    const buffer = await spotify.downloadTrack(track);
-
-    res.json({
-      status: true,
-      creator: "RADIO|IZANA",
-      data: {
-        id: track.id,
-        name: track.name,
-        artists: track.artists?.map(a => a.name) || [],
-        type: type === "track" ? "audio" : "playlist",
-        duration: track.duration_ms,
-        download: buffer.toString("base64")
-      }
+    
+    // استخراج Track ID
+    const trackId = spotify.parseSpotifyUrl(url);
+    
+    // الحصول على معلومات المسار
+    const track = await spotify.getTrackInfo(trackId);
+    
+    // تنزيل المسار
+    const audioBuffer = await spotify.downloadTrack(track);
+    
+    // إرسال الملف
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Disposition': `attachment; filename="${track.name.replace(/[^\w\s-]/g, '')}.mp3"`
     });
+    
+    res.send(audioBuffer);
+
   } catch (err) {
-    res.status(500).json({ status: false, error: err.message });
+    console.error("Spotify Error:", err.message);
+    res.status(500).json({ 
+      status: false, 
+      message: "❌ حدث خطأ أثناء تنزيل المسار", 
+      error: err.message 
+    });
   }
 });
-
 
 export default router;
