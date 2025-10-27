@@ -1,6 +1,6 @@
 /**
- * 📦 Aptoide Direct APK Downloader
- * Description: Search for an app in Aptoide and stream the first APK file directly.
+ * 📦 Aptoide Direct APK Downloader (Fixed)
+ * Description: Searches Aptoide and streams the first APK directly (real .apk, not zip)
  * Author: Anas / IZANA ⚔️
  */
 
@@ -19,7 +19,7 @@ class AptoideAPI {
     };
   }
 
-  /** 🔍 ابحث عن أول تطبيق */
+  /** 🔍 البحث عن أول تطبيق */
   async searchFirstApp(query) {
     const url = `${this.baseUrl}/apps/search?query=${encodeURIComponent(query)}&limit=1`;
     const res = await axios.get(url, { headers: this.headers });
@@ -29,14 +29,14 @@ class AptoideAPI {
   }
 }
 
-/** 🧩 GET Route - تحميل مباشر */
+/** 🧩 Route GET */
 router.get("/", async (req, res) => {
   try {
     const query = req.query.query;
     if (!query)
       return res.status(400).json({
         status: false,
-        message: "⚠️ أرسل اسم التطبيق في المعلمة ?query=",
+        message: "⚠️ أرسل اسم التطبيق عبر ?query=",
       });
 
     const aptoide = new AptoideAPI();
@@ -54,45 +54,56 @@ router.get("/", async (req, res) => {
         message: "⚠️ لم يتم العثور على رابط تحميل مباشر",
       });
 
-    // إعداد رأس التحميل
-    const filename = `${app.name || "app"}_${app.file?.vername || "latest"}.apk`;
+    // اسم الملف وامتداده .apk دائمًا
+    const filename = `${app.name?.replace(/\s+/g, "_") || "app"}_${app.file?.vername || "latest"}.apk`;
+
+    // إعداد الرؤوس
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Cache-Control", "no-cache");
 
-    // 🔁 تحميل الـAPK من مصدره وإرساله للمستخدم
+    console.log(`📦 جاري تحميل ${filename} من ${downloadUrl}`);
+
+    // طلب الملف بدون فك ضغط (gzip)
     const response = await axios.get(downloadUrl, {
       responseType: "stream",
-      headers: { "User-Agent": "Aptoide-Downloader/1.0" },
+      decompress: false, // 🔧 منع التحويل إلى zip/gzip
+      headers: {
+        "User-Agent": "Aptoide-Downloader/1.0",
+        Accept: "*/*",
+        Connection: "keep-alive",
+      },
     });
 
+    // بث مباشر للملف apk
     response.data.pipe(res);
 
     response.data.on("end", () => {
-      console.log(`✅ تم تحميل ${filename} بنجاح`);
+      console.log(`✅ تم إرسال ${filename} بنجاح`);
     });
 
     response.data.on("error", (err) => {
-      console.error("❌ خطأ أثناء التحميل:", err.message);
-      res.status(500).end("❌ فشل التحميل");
+      console.error("❌ خطأ أثناء البث:", err.message);
+      res.status(500).end("❌ فشل تحميل الملف");
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء التحميل من Aptoide",
+      message: "❌ حدث خطأ أثناء تحميل التطبيق",
       error: err.message,
     });
   }
 });
 
-/** 🧩 POST Route - نفس الشيء لكن باستخدام body */
+/** 🧩 Route POST */
 router.post("/", async (req, res) => {
   try {
     const { query } = req.body;
     if (!query)
       return res.status(400).json({
         status: false,
-        message: "⚠️ أرسل حقل 'query' في body JSON",
+        message: "⚠️ أرسل حقل 'query' داخل body",
       });
 
     const aptoide = new AptoideAPI();
@@ -110,30 +121,39 @@ router.post("/", async (req, res) => {
         message: "⚠️ لم يتم العثور على رابط تحميل مباشر",
       });
 
-    const filename = `${app.name || "app"}_${app.file?.vername || "latest"}.apk`;
+    const filename = `${app.name?.replace(/\s+/g, "_") || "app"}_${app.file?.vername || "latest"}.apk`;
+
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Cache-Control", "no-cache");
+
+    console.log(`📦 جاري تحميل ${filename} من ${downloadUrl}`);
 
     const response = await axios.get(downloadUrl, {
       responseType: "stream",
-      headers: { "User-Agent": "Aptoide-Downloader/1.0" },
+      decompress: false,
+      headers: {
+        "User-Agent": "Aptoide-Downloader/1.0",
+        Accept: "*/*",
+        Connection: "keep-alive",
+      },
     });
 
     response.data.pipe(res);
 
     response.data.on("end", () => {
-      console.log(`✅ تم تحميل ${filename} بنجاح`);
+      console.log(`✅ تم إرسال ${filename} بنجاح`);
     });
 
     response.data.on("error", (err) => {
-      console.error("❌ خطأ أثناء التحميل:", err.message);
-      res.status(500).end("❌ فشل التحميل");
+      console.error("❌ خطأ أثناء البث:", err.message);
+      res.status(500).end("❌ فشل تحميل الملف");
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء التحميل من Aptoide",
+      message: "❌ حدث خطأ أثناء تحميل التطبيق",
       error: err.message,
     });
   }
