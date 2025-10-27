@@ -65,15 +65,6 @@ router.get("/", async (req, res) => {
       headers: { "User-Agent": "Aptoide-Downloader/1.0" },
     });
 
-    // تأكد من أن الملف هو APK وليس ZIP أو نوع آخر
-    const contentType = response.headers['content-type'];
-    if (!contentType || !contentType.includes('apk')) {
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ الملف الذي تم تنزيله ليس APK!"
-      });
-    }
-
     response.data.pipe(res);
 
     response.data.on("end", () => {
@@ -127,15 +118,6 @@ router.post("/", async (req, res) => {
       responseType: "stream",
       headers: { "User-Agent": "Aptoide-Downloader/1.0" },
     });
-
-    // تأكد من أن الملف هو APK وليس ZIP أو نوع آخر
-    const contentType = response.headers['content-type'];
-    if (!contentType || !contentType.includes('apk')) {
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ الملف الذي تم تنزيله ليس APK!"
-      });
-    }
 
     response.data.pipe(res);
 
