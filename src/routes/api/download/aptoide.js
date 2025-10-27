@@ -1,11 +1,6 @@
-/**
- * 📦 Aptoide Direct APK Downloader
- * Description: Search for an app in Aptoide and stream the first APK file directly.
- * Author: Anas / IZANA ⚔️
- */
-
 import express from "express";
 import axios from "axios";
+import JSZip from "jszip";
 
 const router = express.Router();
 
@@ -26,6 +21,37 @@ class AptoideAPI {
     const app = res.data?.datalist?.list?.[0];
     if (!app) throw new Error("❌ لم يتم العثور على التطبيق المطلوب!");
     return app;
+  }
+}
+
+/** 🔧 فحص وفك ضغط الملف إذا كان ZIP */
+async function extractApkIfZipped(buffer, filename) {
+  // فحص إذا كان الملف ZIP (يبدأ بـ PK)
+  const isZip = buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03;
+  
+  if (!isZip) {
+    // الملف APK مباشرة
+    return { buffer, filename };
+  }
+
+  try {
+    // فك ضغط الـ ZIP
+    const zip = await JSZip.loadAsync(buffer);
+    const files = Object.keys(zip.files);
+    
+    // البحث عن ملف .apk
+    const apkFile = files.find(name => /\.apk$/i.test(name) && !zip.files[name].dir);
+    
+    if (!apkFile) {
+      throw new Error("❌ لم يتم العثور على ملف APK داخل الـ ZIP");
+    }
+
+    const apkBuffer = await zip.files[apkFile].async("nodebuffer");
+    const apkName = apkFile.split('/').pop();
+    
+    return { buffer: apkBuffer, filename: apkName };
+  } catch (err) {
+    throw new Error(`❌ فشل فك ضغط الـ ZIP: ${err.message}`);
   }
 }
 
@@ -54,27 +80,27 @@ router.get("/", async (req, res) => {
         message: "⚠️ لم يتم العثور على رابط تحميل مباشر",
       });
 
-    // إعداد رأس التحميل
-    const filename = `${app.name || "app"}_${app.file?.vername || "latest"}.apk`;
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    let filename = `${app.name || "app"}_${app.file?.vername || "latest"}.apk`;
 
-    // 🔁 تحميل الـAPK من مصدره وإرساله للمستخدم
+    // تحميل الملف كـ buffer
     const response = await axios.get(downloadUrl, {
-      responseType: "stream",
+      responseType: "arraybuffer",
       headers: { "User-Agent": "Aptoide-Downloader/1.0" },
     });
 
-    response.data.pipe(res);
+    const buffer = Buffer.from(response.data);
 
-    response.data.on("end", () => {
-      console.log(`✅ تم تحميل ${filename} بنجاح`);
-    });
+    // فحص وفك الضغط إذا كان ZIP
+    const { buffer: apkBuffer, filename: apkFilename } = await extractApkIfZipped(buffer, filename);
 
-    response.data.on("error", (err) => {
-      console.error("❌ خطأ أثناء التحميل:", err.message);
-      res.status(500).end("❌ فشل التحميل");
-    });
+    // إرسال الـ APK
+    res.setHeader("Content-Disposition", `attachment; filename="${apkFilename}"`);
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Length", apkBuffer.length);
+
+    res.send(apkBuffer);
+
+    console.log(`✅ تم إرسال ${apkFilename} بنجاح`);
   } catch (err) {
     console.error(err);
     res.status(500).json({
@@ -110,25 +136,25 @@ router.post("/", async (req, res) => {
         message: "⚠️ لم يتم العثور على رابط تحميل مباشر",
       });
 
-    const filename = `${app.name || "app"}_${app.file?.vername || "latest"}.apk`;
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    let filename = `${app.name || "app"}_${app.file?.vername || "latest"}.apk`;
 
     const response = await axios.get(downloadUrl, {
-      responseType: "stream",
+      responseType: "arraybuffer",
       headers: { "User-Agent": "Aptoide-Downloader/1.0" },
     });
 
-    response.data.pipe(res);
+    const buffer = Buffer.from(response.data);
 
-    response.data.on("end", () => {
-      console.log(`✅ تم تحميل ${filename} بنجاح`);
-    });
+    // فحص وفك الضغط إذا كان ZIP
+    const { buffer: apkBuffer, filename: apkFilename } = await extractApkIfZipped(buffer, filename);
 
-    response.data.on("error", (err) => {
-      console.error("❌ خطأ أثناء التحميل:", err.message);
-      res.status(500).end("❌ فشل التحميل");
-    });
+    res.setHeader("Content-Disposition", `attachment; filename="${apkFilename}"`);
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Length", apkBuffer.length);
+
+    res.send(apkBuffer);
+
+    console.log(`✅ تم إرسال ${apkFilename} بنجاح`);
   } catch (err) {
     console.error(err);
     res.status(500).json({
