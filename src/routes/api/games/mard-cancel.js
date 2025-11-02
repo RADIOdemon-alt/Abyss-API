@@ -8,19 +8,20 @@ const router = express.Router();
 /** 🎭 كلاس المارد الأزرق - إلغاء الإجابة */
 class MardCancelAPI {
   constructor() {
-    this.baseUrl = "https://ar.akinator.com/cancel_answer";
+    this.baseUrl = "https://ar.akinator.com/answer";
     this.headers = {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Mozilla/5.0 (Linux; Android 14; 22120RN86G Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7390.122 Mobile Safari/537.36",
+      "X-Requested-With": "XMLHttpRequest",
+      Origin: "https://ar.akinator.com",
+      Referer: "https://ar.akinator.com/game",
     };
   }
 
-  /** تحويل مسار صورة نسبي إلى مطلق اعتمادًا على الدومين */
   _absUrl(src) {
     if (!src) return null;
     try {
-      // حالات: //domain/.. , /path , relative.jpg , http(s)://...
       if (src.startsWith("//")) return "https:" + src;
       if (src.startsWith("http://") || src.startsWith("https://")) return src;
       return new URL(src, "https://ar.akinator.com").href;
@@ -29,11 +30,10 @@ class MardCancelAPI {
     }
   }
 
-  /** محاولة استخراج اسم التخمين وصورته من HTML */
+  /** 🔍 استخراج التخمين من HTML */
   _extractGuessFromHtml(html) {
     const $ = cheerio.load(html);
 
-    // 1) حاول الميتا أولًا (og:title, og:image, description)
     const ogTitle =
       $('meta[property="og:title"]').attr("content") ||
       $('meta[name="og:title"]').attr("content") ||
@@ -45,220 +45,132 @@ class MardCancelAPI {
     const description =
       $('meta[property="og:description"]').attr("content") ||
       $('meta[name="description"]').attr("content") ||
+      $(".subname").first().text().trim() ||
+      $(".description").first().text().trim() ||
       null;
 
-    // 2) محاولات اختيار العناصر المتوقعة في الصفحة
-    const nameSelectors = [
-      "#guessName",
-      "#guess-name",
-      ".guess-name",
-      ".entity-name",
-      ".result h2",
-      "h1",
-      "h2",
-      ".card-title",
-      ".character-name",
-      ".candidate__name",
-    ];
-    let name = null;
-    for (const s of nameSelectors) {
-      const t = $(s).first().text().trim();
-      if (t) {
-        name = t;
-        break;
-      }
+    const possibleName =
+      $("#perso").text().trim() ||
+      $(".bubble-name").text().trim() ||
+      $(".bubble-body .name").text().trim() ||
+      $(".bubble-body strong").text().trim() ||
+      $("h1, h2, .name, .guess-name, .entity-name")
+        .first()
+        .text()
+        .trim() ||
+      ogTitle;
+
+    let img =
+      $("img#photo").attr("src") ||
+      $("img.main-picture").attr("src") ||
+      $("img.character").attr("src") ||
+      $('img[src*="/uploads/"]').attr("src") ||
+      $('img[src*="/imgs/"]').attr("src") ||
+      $('img[src*="/characters/"]').attr("src") ||
+      ogImage;
+
+    if (!img) {
+      const style = $("#photo, .picture, .main-picture").attr("style") || "";
+      const bgMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
+      if (bgMatch && bgMatch[1]) img = bgMatch[1];
     }
 
-    // 3) محاولات أخذ صورة من تسلسلات img منطقية
-    const imgSelectors = [
-      'img[id*="guess"]',
-      'img[class*="guess"]',
-      'img[class*="character"]',
-      'img[src*="/uploads/"]',
-      'img[src*="/imgs/"]',
-      'img[src*="/images/"]',
-      "img",
-    ];
-    let img = null;
-    for (const s of imgSelectors) {
-      const el = $(s).first();
-      const src = el.attr("src") || el.attr("data-src") || el.attr("data-original");
-      if (src && src.trim()) {
-        img = src.trim();
-        break;
-      }
-      // بعض الصفحات تضم صورة داخل background-image
-      const styleBg = el.attr("style") || "";
-      const m = styleBg.match(/url\(['"]?(.*?)['"]?\)/);
-      if (m && m[1]) {
-        img = m[1];
-        break;
-      }
-    }
-
-    // 4) fallback: نص من ogTitle إن لم نجد اسم من السيلكتور
-    if (!name && ogTitle) name = ogTitle;
-
-    // 5) إن لم نجد صورة من السيلكتور خذ ogImage
-    if (!img && ogImage) img = ogImage;
-
-    // 6) تأكد من تحويل المسار إلى URL مطلق
     const image = this._absUrl(img);
 
-    if (!name && !image && !description) {
-      return null;
-    }
+    if (!possibleName && !image && !description) return null;
 
     return {
-      name: name || null,
-      description: description || null,
-      image: image || null,
+      name: possibleName || "غير معروف",
+      description: description || "بدون وصف",
+      image: image || "https://i.imgur.com/5cX1VFt.png",
     };
   }
 
-  /** 🔹 إرسال طلب إلغاء الإجابة */
-  async cancel({ step, progression, session, signature }) {
-    if (!step || !progression || !session || !signature) {
-      throw new Error(
-        "⚠️ جميع الحقول مطلوبة: step, progression, session, signature"
-      );
+  /** 🔹 تنفيذ طلب cancel_answer / إرسال إجابة */
+  async cancel({ step, progression, session, signature, answer, step_last_proposition = "" }) {
+    if (!step || !progression || !session || !signature || answer === undefined) {
+      throw new Error("⚠️ الحقول مطلوبة: step, progression, session, signature, answer");
     }
 
-    try {
-      const response = await axios.post(
-        this.baseUrl,
-        new URLSearchParams({
-          step,
-          progression,
-          session,
-          signature,
-          cm: "false",
-          sid: "NaN",
-        }),
-        { headers: this.headers, responseType: "text" } // نحصل على نص لأن Akinator قد يرجع HTML
-      );
+    const response = await axios.post(
+      this.baseUrl,
+      new URLSearchParams({
+        step,
+        progression,
+        session,
+        signature,
+        cm: "false",
+        sid: "NaN",
+        answer,
+        step_last_proposition,
+      }),
+      { headers: this.headers, responseType: "text" }
+    );
 
-      let result = response.data;
-
-      // إذا كان الرد JSON (سلسلة قابلة للتحويل)، حاول تحويلها
+    let result = response.data;
+    if (typeof result === "string" && result.trim().startsWith("{")) {
       try {
-        if (typeof result === "string" && result.trim().startsWith("{")) {
-          const parsed = JSON.parse(result);
-          result = parsed;
-        }
-      } catch {
-        // لا تفعل شيئًا — المحتوى قد يكون HTML صالحًا
-      }
-
-      // إذا جاء حقل akitude (كما في النسخة السابقة) أنشئ رابط الصورة
-      if (result && result.akitude) {
-        result.akitude_url = `https://ar.akinator.com/assets/img/akitudes_520x650/${result.akitude}`;
-      }
-
-      // الآن: إذا كان الرد HTML أو يحتوي على HTML، حاول استخراج التخمين (الاسم + الصورة)
-      let guess = null;
-      if (typeof result === "string" && result.includes("<")) {
-        guess = this._extractGuessFromHtml(result);
-      } else if (result && typeof result === "object") {
-        // أحيانًا الـ API يرجع حقل html أو partialHtml داخل object
-        const htmlCandidates = [
-          result.html,
-          result.partialHtml,
-          result.page,
-          result.data,
-        ].filter(Boolean);
-        for (const h of htmlCandidates) {
-          if (typeof h === "string" && h.includes("<")) {
-            guess = this._extractGuessFromHtml(h);
-            if (guess) break;
-          }
-        }
-
-        // إن لم نجد تخمينًا لكن يوجد akitude_url فنستخدمه كصورة مع اسم محتمل
-        if (!guess && result.akitude_url) {
-          guess = {
-            name: result.name || result.guess_name || null,
-            description: result.description || null,
-            image: result.akitude_url,
-          };
-        }
-      }
-
-      // أرفق التخمين داخل النتيجة
-      if (guess) {
-        result.guess = guess;
-      }
-
-      return result;
-    } catch (err) {
-      // إذا جاء رد خام من axios، ضع raw data للمساعدة في التصحيح
-      throw new Error(
-        `فشل تنفيذ cancel_answer: ${err.response?.data || err.message}`
-      );
+        result = JSON.parse(result);
+      } catch {}
     }
+
+    let guess = null;
+
+    if (typeof result === "string" && result.includes("<html")) {
+      guess = this._extractGuessFromHtml(result);
+    } else if (result && typeof result === "object") {
+      const htmlCandidates = [
+        result.html,
+        result.partialHtml,
+        result.page,
+        result.data,
+      ].filter(Boolean);
+      for (const h of htmlCandidates) {
+        if (typeof h === "string" && h.includes("<")) {
+          guess = this._extractGuessFromHtml(h);
+          if (guess) break;
+        }
+      }
+    }
+
+    if (guess) result.guess = guess;
+
+    return result;
   }
 }
 
-/** 🧩 POST Route */
-router.post("/", async (req, res) => {
+/** 🧩 GET & POST */
+const handler = async (req, res) => {
   try {
-    const { step, progression, session, signature } = req.body;
+    const body = req.method === "GET" ? req.query : req.body;
+    const { step, progression, session, signature, answer, step_last_proposition } = body;
 
-    if (!step || !progression || !session || !signature) {
+    if (!step || !progression || !session || !signature || answer === undefined) {
       return res.status(400).json({
         status: false,
-        message:
-          "⚠️ الحقول مطلوبة: step, progression, session, signature",
+        message: "⚠️ الحقول مطلوبة: step, progression, session, signature, answer",
       });
     }
 
     const mard = new MardCancelAPI();
-    const result = await mard.cancel({ step, progression, session, signature });
+    const result = await mard.cancel({ step, progression, session, signature, answer, step_last_proposition });
 
     res.json({
       status: true,
-      message: "✅ تم إلغاء الإجابة بنجاح",
+      message: "✅ تم إرسال الإجابة بنجاح واسترجاع السؤال/التخمين",
       data: result,
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌ [MardCancelAPI Error]", err);
     res.status(500).json({
       status: false,
       message: "❌ حدث خطأ أثناء إلغاء الإجابة",
       error: err.message,
     });
   }
-});
+};
 
-/** 🧩 GET Route (اختياري للاختبار عبر الرابط) */
-router.get("/", async (req, res) => {
-  try {
-    const { step, progression, session, signature } = req.query;
-
-    if (!step || !progression || !session || !signature) {
-      return res.status(400).json({
-        status: false,
-        message:
-          "⚠️ الحقول مطلوبة: step, progression, session, signature",
-      });
-    }
-
-    const mard = new MardCancelAPI();
-    const result = await mard.cancel({ step, progression, session, signature });
-
-    res.json({
-      status: true,
-      message: "✅ تم إلغاء الإجابة بنجاح",
-      data: result,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: false,
-      message: "❌ حدث خطأ أثناء إلغاء الإجابة",
-      error: err.message,
-    });
-  }
-});
+router.get("/", handler);
+router.post("/", handler);
 
 export default router;
