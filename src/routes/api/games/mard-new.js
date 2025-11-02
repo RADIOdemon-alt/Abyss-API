@@ -1,3 +1,4 @@
+// routes/mard-new.js
 import express from "express";
 import axios from "axios";
 
@@ -13,116 +14,93 @@ class AkinatorAPI {
     };
   }
 
-  async answer({ session, signature, step, answer, progression, extra = {} }) {
-    const body = new URLSearchParams({
-      session,
-      signature,
-      step,
-      answer,
-      progression,
+  // إرسال الإجابة إلى /answer
+  async answer(paramsObj) {
+    const params = new URLSearchParams({
       cm: "false",
       sid: "NaN",
-      ...extra,
+      ...paramsObj,
     });
 
-    const res = await axios.post(`${this.base}/answer`, body.toString(), {
+    const res = await axios.post(`${this.base}/answer`, params.toString(), {
       headers: this.headers,
+      timeout: 15000,
     });
     return res.data;
   }
 
-  async cancelAnswer({ session, signature, step, progression, extra = {} }) {
-    const body = new URLSearchParams({
-      session,
-      signature,
-      step,
-      progression,
+  // طلب fallback من /cancel_answer
+  async cancelAnswer(paramsObj) {
+    const params = new URLSearchParams({
       cm: "false",
       sid: "NaN",
-      ...extra,
+      ...paramsObj,
     });
 
-    const res = await axios.post(`${this.base}/cancel_answer`, body.toString(), {
+    const res = await axios.post(`${this.base}/cancel_answer`, params.toString(), {
       headers: this.headers,
+      timeout: 15000,
     });
     return res.data;
   }
 
-  /** 🔍 استخراج نص السؤال */
+  // استخراج نص السؤال من أنواع الحقول المختلفة
   extractQuestion(data) {
     if (!data) return null;
-    return (
-      data.question ||
-      data.question_label ||
-      data.questionText ||
-      data.question_text ||
-      (data.questionHTML ? this.stripHtml(data.questionHTML) : null) ||
-      null
-    );
+
+    // بعض نسخ Akinator ترجع السؤال في حقول مختلفة أو داخل HTML
+    const candidates = [
+      data.question,
+      data.question_label,
+      data.questionText,
+      data.question_text,
+      data.questionHTML, // قد يحتوي HTML
+    ];
+
+    for (const c of candidates) {
+      if (c && typeof c === "string" && c.trim()) {
+        // إذا كان HTML نزيل الوسوم
+        if (/<\/?[a-z][\s\S]*>/i.test(c)) {
+          return this.stripHtml(c);
+        }
+        return c.trim();
+      }
+    }
+
+    return null;
   }
 
-  /** 🧩 تنظيف HTML */
   stripHtml(html) {
     return String(html).replace(/<\/?[^>]+(>|$)/g, "").trim();
   }
-
-  /** 🧠 استخراج النتيجة (الشخصية) */
-  extractCompletion(data) {
-    if (!data) return null;
-
-    const isCompletion =
-      data.completion === "KO" ||
-      data.guess ||
-      data.results ||
-      (data.step_information && !data.step_information.answers);
-
-    if (!isCompletion) return null;
-
-    return {
-      completion: "KO",
-      name:
-        data.name ||
-        data.character_name ||
-        data.results?.[0]?.name ||
-        "غير معروف",
-      description:
-        data.description ||
-        data.character_desc ||
-        data.results?.[0]?.description ||
-        "بدون وصف",
-      image:
-        data.akitude
-          ? `https://ar.akinator.com/assets/img/akitudes_520x650/${data.akitude}`
-          : data.photo ||
-            data.results?.[0]?.absolute_picture_path ||
-            "https://i.imgur.com/5cX1VFt.png",
-      proba:
-        data.proba ||
-        data.results?.[0]?.proba ||
-        data.results?.[0]?.ranking ||
-        "0.0",
-    };
-  }
 }
 
-/** 🧩 POST /api/mard/answer
- * Body: { session, signature, step, answer, progression }
- * Returns: السؤال التالي أو النتيجة
+/**
+ * المعالج المشترك
+ * يقبل القيم من body أو query (GET/POST)
+ * الحقول المطلوبة: session, signature, step, answer
  */
-router.post("/answer", async (req, res) => {
+async function handleExtractNextQuestion(req, res) {
   try {
-    const { session, signature, step, answer, progression } = req.body;
+    // دمج body و query بحيث يمكن استخدام GET أو POST
+    const input = { ...req.body, ...req.query };
+
+    const session = input.session;
+    const signature = input.signature;
+    const step = input.step;
+    const answer = input.answer;
+    const progression = input.progression ?? input.progress ?? 0; // بعض العملاء يستخدمون أسماء مختلفة
 
     if (!session || !signature || step == null || answer == null) {
       return res.status(400).json({
         status: false,
-        message: "⚠️ الحقول المطلوبة: session, signature, step, answer",
+        message: "⚠️ الحقول المطلوبة: session, signature, step, answer (ويمكن optional progression)",
       });
     }
 
     const api = new AkinatorAPI();
 
-    // 1️⃣ نرسل الإجابة
+    // 1) نرسل الإجابة أولًا
     const ansData = await api.answer({
       session,
       signature,
@@ -131,37 +109,31 @@ router.post("/answer", async (req, res) => {
       progression,
     });
 
-    // 2️⃣ تحقق: هل هي نتيجة تخمين؟
-    const completion = api.extractCompletion(ansData);
-    if (completion) {
+    // 2) نحاول استخراج السؤال الجديد من /answer مباشرة
+    const directQuestion = api.extractQuestion(ansData);
+
+    if (directQuestion) {
+      return res.json({
+        status: true,
+        message: "✅ سؤال جديد مستلم من /answer",
+        question: directQuestion,
+        // ارتجاع raw مفيد للتصحيح، ويمكن للمستخدم اختيار تجاهله
+        raw: ansData,
+      });
+    }
+
+    // 3) تحقق إن كانت هناك completion / guess (Akinator انتهى)
+    const completionFields = ansData.completion || ansData.guess || ansData.results || ansData.final || null;
+    if (completionFields) {
       return res.json({
         status: true,
         message: "✅ Akinator أعطى نتيجة (completion/guess)",
         type: "completion",
-        data: completion,
-        raw: ansData,
+        data: ansData,
       });
     }
 
-    // 3️⃣ أو سؤال جديد من /answer
-    const nextQ = api.extractQuestion(ansData);
-    if (nextQ) {
-      return res.json({
-        status: true,
-        message: "✅ سؤال جديد مستلم من /answer",
-        type: "continue",
-        data: {
-          question: nextQ,
-          progression:
-            ansData.step_information?.progression ||
-            ansData.progression ||
-            "0",
-        },
-        raw: ansData,
-      });
-    }
-
-    // 4️⃣ لو لم يوجد شيء، استخدم /cancel_answer كـ fallback
+    // 4) fallback: نطلب /cancel_answer لاسترجاع السؤال أو السؤال الحالي
     const cancelData = await api.cancelAnswer({
       session,
       signature,
@@ -169,44 +141,38 @@ router.post("/answer", async (req, res) => {
       progression,
     });
 
-    const canceledQ = api.extractQuestion(cancelData);
-    if (canceledQ) {
+    const fallbackQuestion = api.extractQuestion(cancelData);
+
+    if (fallbackQuestion) {
       return res.json({
         status: true,
         message: "✅ سؤال مسترجع من /cancel_answer (fallback)",
-        type: "continue",
-        data: {
-          question: canceledQ,
-          progression:
-            cancelData.step_information?.progression ||
-            cancelData.progression ||
-            "0",
-        },
+        question: fallbackQuestion,
         raw: cancelData,
       });
     }
 
-    // 5️⃣ فشل في جلب أي سؤال أو نتيجة
+    // 5) إذا لم نحصل على شيء — نرجع الخام لمراجعة client
     return res.status(500).json({
       status: false,
-      message: "❌ لم يتم الحصول على سؤال أو نتيجة من Akinator",
+      message: "❌ لم يتم العثور على سؤال جديد من /answer أو /cancel_answer",
       ansRaw: ansData,
+      cancelRaw: cancelData,
     });
   } catch (err) {
-    console.error("❌ Error in /api/mard/answer:", err);
+    console.error("mard-new error:", err?.response?.data ?? err.message ?? err);
     return res.status(500).json({
       status: false,
-      message: "⚠️ فشل في التواصل مع المارد.",
+      message: "❌ حدث خطأ أثناء محاولة استخراج السؤال الجديد",
       error: err.message,
-      raw: err.response?.data,
+      raw: err.response?.data ?? null,
     });
   }
-});
+}
 
-/** GET /api/mard/answer (للاختبار السريع عبر query params) */
-router.get("/answer", async (req, res) => {
-  req.body = { ...req.body, ...req.query };
-  return router.handle(req, res);
-});
+// ربط المسارات: يدعم POST و GET
+router.post("/", handleExtractNextQuestion);
+router.get("/", handleExtractNextQuestion);
 
+// تصدير الراوتر
 export default router;
