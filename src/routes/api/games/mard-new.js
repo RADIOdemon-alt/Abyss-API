@@ -8,15 +8,27 @@ const router = express.Router();
 class AkinatorAPI {
   constructor() {
     this.base = "https://ar.akinator.com";
+    // رؤوس أساسية مشابهة للـ curl الذي زودتنا به
     this.headers = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "Host": "ar.akinator.com",
+      "Connection": "keep-alive",
+      "sec-ch-ua-platform": '"Android"',
       "X-Requested-With": "XMLHttpRequest",
-      Origin: "https://ar.akinator.com",
-      Referer: "https://ar.akinator.com/game",
+      "User-Agent":
+        "Mozilla/5.0 (Linux; Android 14; 22120RN86G Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7390.122 Mobile Safari/537.36",
+      "Accept": "*/*",
+      "sec-ch-ua": '"Android WebView";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "sec-ch-ua-mobile": "?1",
+      "Origin": "https://ar.akinator.com",
+      "Sec-Fetch-Site": "same-origin",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Dest": "empty",
+      "Referer": "https://ar.akinator.com/game",
+      "Accept-Encoding": "gzip, deflate, br, zstd",
+      "Accept-Language": "ar,en-GB;q=0.9,en-US;q=0.8,en;q=0.7"
     };
-    // مسارات
+
     this.answerPath = "/answer";
     this.cancelPath = "/cancel_answer";
   }
@@ -32,7 +44,104 @@ class AkinatorAPI {
     }
   }
 
-  // استخراج تخمين من HTML (اسم، وصف، صورة)
+  // ارسال POST مطابق للـ curl: body كسلسلة URL encoded، واستلام النص الخام (text)
+  async _postRaw(path, paramsObj = {}, extraHeaders = {}) {
+    const params = new URLSearchParams({
+      cm: "false",
+      sid: "NaN",
+      ...paramsObj,
+    }).toString();
+
+    const headers = { ...this.headers, ...extraHeaders };
+    // السماح بطول body كبير إذا لزم
+    const res = await axios.post(`${this.base}${path}`, params, {
+      headers,
+      responseType: "text",
+      timeout: 15000,
+      maxBodyLength: Infinity,
+      validateStatus: (s) => s >= 200 && s < 500, // نقرأ حتى أخطاء 4xx/5xx للـ debugging
+    });
+
+    return res.data;
+  }
+
+  // wrapper للإجابة
+  async answer(paramsObj = {}) {
+    return await this._postRaw(this.answerPath, paramsObj);
+  }
+
+  // wrapper للإلغاء/استرجاع
+  async cancelAnswer(paramsObj = {}) {
+    return await this._postRaw(this.cancelPath, paramsObj);
+  }
+
+  // تنظيف HTML بسيط
+  stripHtml(html) {
+    return String(html).replace(/<\/?[^>]+(>|$)/g, "").trim();
+  }
+
+  // استخراج نص سؤال من HTML أو JSON
+  extractQuestion(data) {
+    if (!data) return null;
+
+    // لو النص HTML بالكامل
+    if (typeof data === "string") {
+      const trimmed = data.trim();
+      // لو JSON كسلسلة، نجرب parse
+      if (trimmed.startsWith("{")) {
+        try {
+          data = JSON.parse(trimmed);
+        } catch (e) {
+          // تركه HTML
+        }
+      } else if (trimmed.includes("<")) {
+        const $ = cheerio.load(trimmed);
+        const q =
+          $("div#question, .question, #q, .question-text").first().text().trim() ||
+          $("title").text().trim();
+        // لو العنوان "Akinator" نعيد "Akinator" كذلك (نستخدمه كـ إشارة)
+        return q || null;
+      }
+    }
+
+    const candidates = [
+      data?.question,
+      data?.question_label,
+      data?.questionText,
+      data?.question_text,
+      data?.questionHTML,
+      data?.current_question,
+      data?.next_question,
+      data?.partialHtml,
+      data?.html,
+      data?.page,
+      data?.data,
+    ];
+
+    for (const c of candidates) {
+      if (!c) continue;
+      if (typeof c === "string" && c.trim()) {
+        if (/<\/?[a-z][\s\S]*>/i.test(c)) {
+          const s = this.stripHtml(c);
+          if (s) return s;
+        } else return c.trim();
+      }
+      if (typeof c === "object") {
+        const objCandidates = [c.text, c.label, c.question, c.html, c.content];
+        for (const oc of objCandidates) {
+          if (oc && typeof oc === "string" && oc.trim()) {
+            if (/<\/?[a-z][\s\S]*>/i.test(oc)) {
+              const s = this.stripHtml(oc);
+              if (s) return s;
+            } else return oc.trim();
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // استخراج التخمين من HTML أو JSON
   _extractGuessFromHtml(html) {
     if (!html || typeof html !== "string") return null;
     const $ = cheerio.load(html);
@@ -45,7 +154,6 @@ class AkinatorAPI {
       $('meta[property="og:image"]').attr("content") ||
       $('meta[name="og:image"]').attr("content") ||
       null;
-
     const description =
       $('meta[property="og:description"]').attr("content") ||
       $('meta[name="description"]').attr("content") ||
@@ -58,10 +166,7 @@ class AkinatorAPI {
       $(".bubble-name").text().trim() ||
       $(".bubble-body .name").text().trim() ||
       $(".bubble-body strong").text().trim() ||
-      $("h1, h2, .name, .guess-name, .entity-name")
-        .first()
-        .text()
-        .trim() ||
+      $("h1, h2, .name, .guess-name, .entity-name").first().text().trim() ||
       ogTitle;
 
     let img =
@@ -90,188 +195,50 @@ class AkinatorAPI {
     };
   }
 
-  // يرسل طلب /answer
-  async answer(paramsObj) {
-    const params = new URLSearchParams({
-      cm: "false",
-      sid: "NaN",
-      ...paramsObj,
-    });
-
-    const res = await axios.post(
-      `${this.base}${this.answerPath}`,
-      params.toString(),
-      {
-        headers: this.headers,
-        timeout: 15000,
-      }
-    );
-    return res.data;
-  }
-
-  // يرسل طلب /cancel_answer
-  async cancelAnswer(paramsObj) {
-    const params = new URLSearchParams({
-      cm: "false",
-      sid: "NaN",
-      ...paramsObj,
-    });
-
-    const res = await axios.post(
-      `${this.base}${this.cancelPath}`,
-      params.toString(),
-      {
-        headers: this.headers,
-        timeout: 15000,
-      }
-    );
-    return res.data;
-  }
-
-  // تنظيف HTML البسيط
-  stripHtml(html) {
-    return String(html).replace(/<\/?[^>]+(>|$)/g, "").trim();
-  }
-
-  // استخراج نص السؤال من مصادر متعددة
-  extractQuestion(data) {
+  extractGuessFromData(data) {
     if (!data) return null;
 
-    // إذا كان الرد نص HTML كاملاً
-    if (typeof data === "string") {
-      // JSON string?
-      const trimmed = data.trim();
-      if (trimmed.startsWith("{")) {
-        try {
-          data = JSON.parse(trimmed);
-        } catch (e) {
-          // تركه كسلسلة HTML
-        }
-      } else if (trimmed.includes("<")) {
-        // HTML -> حاول استخراج نص من الداخل
-        const $ = cheerio.load(trimmed);
-        const q =
-          $("div#question, .question, #q, .question-text").first().text().trim() ||
-          $("title").text().trim();
-        return q || null;
-      }
+    // لو السلسلة تحتوي HTML
+    if (typeof data === "string" && data.includes("<")) {
+      return this._extractGuessFromHtml(data);
     }
 
-    const candidates = [
-      data.question,
-      data.question_label,
-      data.questionText,
-      data.question_text,
-      data.questionHTML,
-      data.current_question,
-      data.next_question,
-      data.partialHtml,
-      data.html,
-      data.page,
-      data.data,
-    ];
-
-    for (const c of candidates) {
-      if (!c) continue;
-      if (typeof c === "string" && c.trim()) {
-        // لو يحتوى على HTML نزيل الوسوم
-        if (/<\/?[a-z][\s\S]*>/i.test(c)) {
-          const stripped = this.stripHtml(c);
-          if (stripped) return stripped;
-        } else {
-          return c.trim();
+    // لو JSON أكيد
+    if (typeof data === "object") {
+      const guessCandidates = [
+        data.guess,
+        data.completion,
+        data.results,
+        data.final,
+        data.data,
+      ];
+      for (const g of guessCandidates) {
+        if (!g) continue;
+        if (typeof g === "string" && g.includes("<")) {
+          const got = this._extractGuessFromHtml(g);
+          if (got) return got;
         }
-      }
+        if (typeof g === "object") {
+          const name =
+            g.name || g.entity || g.label || g.title || g.name_fr || g.name_en || null;
+          const description =
+            g.description || g.desc || g.subname || g.detail || null;
+          const image =
+            g.picture_url || g.image || g.img || g.photo || g.photo_url || null;
 
-      // بعض الحقول تأتي كـ كائن يحتوي على text/html
-      if (typeof c === "object") {
-        // حاول استخراج من خواص شائعة
-        const objCandidates = [
-          c.text,
-          c.label,
-          c.question,
-          c.html,
-          c.content,
-        ];
-        for (const oc of objCandidates) {
-          if (oc && typeof oc === "string" && oc.trim()) {
-            if (/<\/?[a-z][\s\S]*>/i.test(oc)) {
-              const stripped = this.stripHtml(oc);
-              if (stripped) return stripped;
-            } else {
-              return oc.trim();
-            }
+          if (name || description || image) {
+            return {
+              name: (typeof name === "string" && name.trim()) ? name.trim() : undefined,
+              description: (typeof description === "string" && description.trim()) ? description.trim() : undefined,
+              image: image ? this._absUrl(image) : undefined,
+            };
           }
         }
       }
     }
 
-    return null;
-  }
-
-  // استخراج تخمين من ردود JSON (حقول completion/guess)
-  extractGuessFromData(data) {
-    if (!data) return null;
-
-    // لو الرد HTML كامل
-    if (typeof data === "string" && data.includes("<")) {
-      return this._extractGuessFromHtml(data);
-    }
-
-    // بعض السيرفرات تُرجع التخمين في حقول مختلفة
-    const guessCandidates = [
-      data.guess,
-      data.completion,
-      data.results,
-      data.final,
-      data.data, // ممكن أن يحتوي شيء
-    ];
-
-    for (const g of guessCandidates) {
-      if (!g) continue;
-      // إذا كان سلسلة نصية تحتوي على HTML
-      if (typeof g === "string" && g.includes("<")) {
-        const got = this._extractGuessFromHtml(g);
-        if (got) return got;
-      }
-
-      // إذا كان كائن يحتوي على اسم أو صورة أو وصف
-      if (typeof g === "object") {
-        // بعض الحقول: name, entity, label, description, picture_url, image
-        const name =
-          g.name ||
-          g.entity ||
-          g.label ||
-          g.title ||
-          g.name_fr ||
-          g.name_en ||
-          null;
-        const description =
-          g.description ||
-          g.desc ||
-          g.subname ||
-          g.detail ||
-          null;
-        const image =
-          g.picture_url ||
-          g.image ||
-          g.img ||
-          g.photo ||
-          g.photo_url ||
-          null;
-
-        if (name || description || image) {
-          return {
-            name: (typeof name === "string" && name.trim()) ? name.trim() : undefined,
-            description: (typeof description === "string" && description.trim()) ? description.trim() : undefined,
-            image: image ? this._absUrl(image) : undefined,
-          };
-        }
-      }
-    }
-
-    // أخيرًا، حاول البحث في نصوص HTML المتوفرة في data.partialHtml / data.html
-    const htmlFields = [data.partialHtml, data.html, data.page, data.pageHtml, data.html_page].filter(Boolean);
+    // أخيراً نجرب حقول HTML داخل data
+    const htmlFields = [data?.partialHtml, data?.html, data?.page, data?.pageHtml, data?.html_page].filter(Boolean);
     for (const h of htmlFields) {
       if (typeof h === "string" && h.includes("<")) {
         const got = this._extractGuessFromHtml(h);
@@ -285,10 +252,9 @@ class AkinatorAPI {
 
 /**
  * المعالج الرئيسي:
- * - يقبل GET/POST
- * - الحقول المطلوبة: session, signature, step, answer
- * - إن كان answer === -1 أو action === 'cancel' -> يستعمل /cancel_answer
- * - يحاول استخراج السؤال التالي أو التخمين النهائي، ويرجع raw للمساعدة
+ * يقبل GET/POST
+ * الحقول المطلوبة: session, signature, step, answer
+ * يدير fallback ذكي إذا أعاد HTML صفحة اللعبة أو سؤال "Akinator"
  */
 async function handleExtractNextQuestion(req, res) {
   try {
@@ -298,7 +264,7 @@ async function handleExtractNextQuestion(req, res) {
     const signature = input.signature;
     const step = input.step;
     const rawAnswer = input.answer;
-    const progression = input.progression ?? input.progress ?? input.progression ?? 0;
+    const progression = input.progression ?? input.progress ?? 0;
     const step_last_proposition = input.step_last_proposition ?? "";
 
     if (!session || !signature || step == null || rawAnswer == null) {
@@ -310,20 +276,20 @@ async function handleExtractNextQuestion(req, res) {
 
     const api = new AkinatorAPI();
 
-    // قرر هل سنستعمل cancel مباشرة؟
+    // عندما تكون القيمة -1 أو action=cancel نستخدم cancelAnswer مباشرة
     const wantCancel =
       String(rawAnswer) === "-1" ||
       input.action === "cancel" ||
-      input.cancel === "true" ||
-      input.cancel === true;
+      input.cancel === true ||
+      input.cancel === "true";
 
-    let ansData = null;
+    let ansRaw = null;
     let usedCancel = false;
 
+    // 1) أرسل /answer أو /cancel_answer حسب الطلب
     if (!wantCancel) {
-      // 1) نرسل الإجابة أولًا (العملية العادية)
       try {
-        ansData = await api.answer({
+        ansRaw = await api.answer({
           session,
           signature,
           step,
@@ -332,50 +298,14 @@ async function handleExtractNextQuestion(req, res) {
           step_last_proposition,
         });
       } catch (e) {
-        // لو فشل /answer نستخدم cancel كـ fallback لاحقًا
+        // إذا فشل /answer خزن الاستجابة أو الرسالة
         console.warn("Akinator /answer failed:", e?.response?.data ?? e.message ?? e);
-        ansData = e?.response?.data ?? null;
+        ansRaw = e?.response?.data ?? null;
       }
     } else {
-      // المستخدم طلب إلغاء مباشرة
       usedCancel = true;
-      ansData = await api.cancelAnswer({
-        session,
-        signature,
-        step,
-        progression,
-      });
-    }
-
-    // حاول استخراج سؤال مباشر من نتيجة /answer
-    const directQuestion = api.extractQuestion(ansData);
-    if (directQuestion) {
-      return res.json({
-        status: true,
-        message: usedCancel ? "✅ سؤال مسترجع من /cancel_answer" : "✅ سؤال جديد مستلم من /answer",
-        type: "question",
-        question: directQuestion,
-        raw: ansData,
-      });
-    }
-
-    // تحقق إن كانت هناك نتيجة / تخمين
-    const guessFromAns = api.extractGuessFromData(ansData);
-    if (guessFromAns) {
-      return res.json({
-        status: true,
-        message: "✅ Akinator أعطى نتيجة (guess/completion) من /answer",
-        type: "guess",
-        guess: guessFromAns,
-        raw: ansData,
-      });
-    }
-
-    // إذا لم يكن هناك سؤال أو تخمين من /answer، فنجرب /cancel_answer كـ fallback (إن لم نستخدمه)
-    let cancelData = null;
-    if (!usedCancel) {
       try {
-        cancelData = await api.cancelAnswer({
+        ansRaw = await api.cancelAnswer({
           session,
           signature,
           step,
@@ -383,38 +313,173 @@ async function handleExtractNextQuestion(req, res) {
         });
       } catch (e) {
         console.warn("Akinator /cancel_answer failed:", e?.response?.data ?? e.message ?? e);
-        cancelData = e?.response?.data ?? null;
+        ansRaw = e?.response?.data ?? null;
       }
+    }
 
-      const fallbackQuestion = api.extractQuestion(cancelData);
-      if (fallbackQuestion) {
-        return res.json({
-          status: true,
-          message: "✅ سؤال مسترجع من /cancel_answer (fallback)",
-          type: "question",
-          question: fallbackQuestion,
-          raw: cancelData,
-        });
-      }
+    // 2) حاول استخراج سؤال أو تخمين مباشرة
+    const directQ = api.extractQuestion(ansRaw);
+    if (directQ) {
+      return res.json({
+        status: true,
+        message: usedCancel ? "✅ سؤال مسترجع من /cancel_answer" : "✅ سؤال جديد مستلم من /answer",
+        type: "question",
+        question: directQ,
+        raw: ansRaw,
+      });
+    }
 
-      const guessFromCancel = api.extractGuessFromData(cancelData);
-      if (guessFromCancel) {
-        return res.json({
-          status: true,
-          message: "✅ Akinator أعطى نتيجة (guess/completion) من /cancel_answer",
-          type: "guess",
-          guess: guessFromCancel,
-          raw: cancelData,
+    const guessFromAns = api.extractGuessFromData(ansRaw);
+    if (guessFromAns) {
+      return res.json({
+        status: true,
+        message: "✅ Akinator أعطى نتيجة (guess/completion) من /answer",
+        type: "guess",
+        guess: guessFromAns,
+        raw: ansRaw,
+      });
+    }
+
+    // 3) إن كانت الاستجابة HTML لصفحة اللعبة (مثلاً العنوان "Akinator") -> نجرب fallback ذكي:
+    if (typeof ansRaw === "string" && ansRaw.includes("<")) {
+      const $ = cheerio.load(ansRaw);
+      const title = ($("title").text() || "").trim();
+      // لو الصفحة هي صفحة Akinator فالمطلوب إجراء cancel أو طلب التخمين النهائي
+      if (title && title.toLowerCase().includes("akinator")) {
+        // 3.a) نجرب cancel_answer أولًا
+        let cancelRaw = null;
+        try {
+          cancelRaw = await api.cancelAnswer({
+            session,
+            signature,
+            step,
+            progression,
+          });
+        } catch (e) {
+          cancelRaw = e?.response?.data ?? null;
+        }
+
+        // إذا أرجع سؤال نعيده
+        const fallbackQ = api.extractQuestion(cancelRaw);
+        if (fallbackQ) {
+          return res.json({
+            status: true,
+            message: "✅ سؤال مسترجع من /cancel_answer (fallback-html)",
+            type: "question",
+            question: fallbackQ,
+            raw: cancelRaw,
+          });
+        }
+
+        // إذا أرجع تخمين
+        const fallbackGuess = api.extractGuessFromData(cancelRaw);
+        if (fallbackGuess) {
+          return res.json({
+            status: true,
+            message: "✅ Akinator أعطى نتيجة من /cancel_answer (fallback-html)",
+            type: "guess",
+            guess: fallbackGuess,
+            raw: cancelRaw,
+          });
+        }
+
+        // 3.b) نجرب طلب إنهاء التخمين عبر answer=-1 كوسيلة أخيرة
+        try {
+          const finalRaw = await api.answer({
+            session,
+            signature,
+            step,
+            answer: "-1",
+            progression,
+            step_last_proposition,
+          });
+
+          const finalGuess = api.extractGuessFromData(finalRaw);
+          if (finalGuess) {
+            return res.json({
+              status: true,
+              message: "✅ تم الحصول على التخمين بعد طلب النهائي (answer=-1)",
+              type: "guess",
+              guess: finalGuess,
+              raw: finalRaw,
+            });
+          }
+
+          const finalQ = api.extractQuestion(finalRaw);
+          if (finalQ) {
+            return res.json({
+              status: true,
+              message: "✅ سؤال بعد طلب النهائي (answer=-1)",
+              type: "question",
+              question: finalQ,
+              raw: finalRaw,
+            });
+          }
+        } catch (e) {
+          // تجاهل واستمر للأسفل لإعادة raw للمساعدة
+          console.warn("final answer(-1) failed:", e?.response?.data ?? e.message ?? e);
+        }
+
+        // لا شيء نافع من محاولات fallback
+        return res.status(500).json({
+          status: false,
+          message: "❌ الرد كان صفحة Akinator ولم نتمكن من استخلاص سؤال/تخمين بعد محاولات fallback.",
+          rawAnswer: ansRaw,
+          cancelAttempt: cancelRaw ?? null,
         });
       }
     }
 
-    // لا شيء مفيد — نعيد الخامين لمساعدة العميل في التشخيص
+    // 4) لو لم نحصل على شيء من /answer، نجرّب /cancel_answer كـ fallback (لو لم نستخدمه أصلاً)
+    if (!usedCancel) {
+      let cancelRaw = null;
+      try {
+        cancelRaw = await api.cancelAnswer({
+          session,
+          signature,
+          step,
+          progression,
+        });
+      } catch (e) {
+        console.warn("Akinator /cancel_answer failed (fallback):", e?.response?.data ?? e.message ?? e);
+        cancelRaw = e?.response?.data ?? null;
+      }
+
+      const fallbackQ = api.extractQuestion(cancelRaw);
+      if (fallbackQ) {
+        return res.json({
+          status: true,
+          message: "✅ سؤال مسترجع من /cancel_answer (fallback)",
+          type: "question",
+          question: fallbackQ,
+          raw: cancelRaw,
+        });
+      }
+      const fallbackGuess = api.extractGuessFromData(cancelRaw);
+      if (fallbackGuess) {
+        return res.json({
+          status: true,
+          message: "✅ Akinator أعطى نتيجة (guess/completion) من /cancel_answer (fallback)",
+          type: "guess",
+          guess: fallbackGuess,
+          raw: cancelRaw,
+        });
+      }
+
+      // لم ينجح أي شيء
+      return res.status(500).json({
+        status: false,
+        message: "❌ لم يتم العثور على سؤال أو تخمين من /answer أو /cancel_answer (fallback).",
+        ansRaw,
+        cancelRaw,
+      });
+    }
+
+    // 5) إفشال نهائي: أعد الخام للمساعدة في التشخيص
     return res.status(500).json({
       status: false,
-      message: "❌ لم يتم العثور على سؤال أو تخمين من /answer أو /cancel_answer",
-      ansRaw: ansData,
-      cancelRaw: cancelData,
+      message: "❌ لم يتم العثور على سؤال أو تخمين من الاستجابة.",
+      ansRaw,
     });
   } catch (err) {
     console.error("mard-new error:", err?.response?.data ?? err.message ?? err);
