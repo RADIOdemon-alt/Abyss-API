@@ -1,109 +1,122 @@
-// 📁 routes/mardAnswer.js
+// routes/mard-answer.js
 import express from "express";
 import axios from "axios";
 
 const router = express.Router();
 
-/** 🎩 كلاس خاص بالتعامل مع Akinator */
-class MaridAPI {
+/** 🎭 كلاس المارد الأزرق - إرسال الإجابة */
+class MardAnswerAPI {
   constructor() {
     this.baseUrl = "https://ar.akinator.com";
     this.headers = {
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent":
-        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-      Accept: "*/*",
-      "Accept-Language": "ar,en;q=0.9",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     };
   }
 
-  /** 🔹 إرسال الإجابة وجلب السؤال التالي */
-  async nextQuestion({ session, signature, step, answer, progression = "0.0" }) {
-    if (!session || !signature || step === undefined || answer === undefined)
-      throw new Error("⚠️ البيانات المطلوبة غير مكتملة (session, signature, step, answer)");
+  /** 🔹 إرسال الإجابة */
+  async answer(body) {
+    if (!body || typeof body !== "object" || Object.keys(body).length === 0) {
+      throw new Error("⚠️ لا يوجد بيانات مرسلة في body!");
+    }
 
-    const body = new URLSearchParams({
-      session,
-      signature,
-      step,
-      answer,
-      progression,
-      cm: "false",
-      sid: "1",
-    });
+    try {
+      const { data } = await axios.post(
+        `${this.baseUrl}/answer`,
+        new URLSearchParams(body),
+        { headers: this.headers }
+      );
+      return data;
+    } catch (err) {
+      throw new Error(
+        `فشل تنفيذ answer: ${err.response?.data || err.message}`
+      );
+    }
+  }
 
-    const response = await axios.post(`${this.baseUrl}/answer`, body, {
-      headers: this.headers,
-    });
-
-    const html = response.data;
-
-    // 🔍 استخراج السؤال التالي
-    const match = html.match(/<div id="question-label"[^>]*>(.*?)<\/div>/);
-    const nextQuestion = match ? match[1].trim() : null;
-
-    // 🔍 استخراج صورة المارد أو akitude
-    const akitudeMatch = html.match(/akitudes_520x650\/(.*?)"/);
-    const akitude_url = akitudeMatch
-      ? `${this.baseUrl}/assets/img/akitudes_520x650/${akitudeMatch[1]}`
-      : null;
-
-    return {
-      status: true,
-      message: nextQuestion
-        ? "✅ تم جلب السؤال التالي بنجاح"
-        : "⚠️ لم يتم العثور على سؤال جديد (ربما انتهت الجولة)",
-      question: nextQuestion,
-      akitude_url,
-    };
+  /** 🔹 جلب السؤال التالي */
+  async getNextQuestion(session, signature, step) {
+    try {
+      const url = `${this.baseUrl}/question?session=${session}&signature=${encodeURIComponent(
+        signature
+      )}&step=${step}`;
+      const { data } = await axios.get(url, { headers: this.headers });
+      return data;
+    } catch (err) {
+      throw new Error(
+        `فشل في جلب السؤال التالي: ${err.response?.data || err.message}`
+      );
+    }
   }
 }
 
 /** 🧩 POST Route */
 router.post("/", async (req, res) => {
   try {
-    const { session, signature, step, answer, progression } = req.body;
+    const mard = new MardAnswerAPI();
+    const result = await mard.answer(req.body);
 
-    const marid = new MaridAPI();
-    const result = await marid.nextQuestion({
-      session,
-      signature,
-      step,
-      answer,
-      progression,
+    let nextQuestion = null;
+
+    // 🔹 إذا ما فيه سؤال في الرد أو ظهرت علامة KO، نجيب السؤال التالي
+    if (!result.question || result.completion === "KO") {
+      const { session, signature, step } = req.body;
+      if (session && signature && step !== undefined) {
+        nextQuestion = await mard.getNextQuestion(session, signature, step);
+      }
+    }
+
+    res.json({
+      status: true,
+      message: "✅ تم إرسال الإجابة بنجاح",
+      data: {
+        answer_result: result,
+        next_question: nextQuestion || result.question
+          ? result
+          : "❌ لم يتم العثور على سؤال جديد",
+      },
     });
-
-    res.json(result);
   } catch (err) {
-    console.error("❌ خطأ أثناء جلب السؤال التالي:", err.message);
+    console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء التواصل مع Akinator",
+      message: "❌ حدث خطأ أثناء إرسال الإجابة",
       error: err.message,
     });
   }
 });
 
-/** 🧩 GET Route (اختياري لاختبار مباشر عبر المتصفح) */
+/** 🧩 GET Route (اختياري للاختبار من المتصفح) */
 router.get("/", async (req, res) => {
   try {
-    const { session, signature, step, answer, progression } = req.query;
+    const mard = new MardAnswerAPI();
+    const result = await mard.answer(req.query);
 
-    const marid = new MaridAPI();
-    const result = await marid.nextQuestion({
-      session,
-      signature,
-      step,
-      answer,
-      progression,
+    let nextQuestion = null;
+
+    if (!result.question || result.completion === "KO") {
+      const { session, signature, step } = req.query;
+      if (session && signature && step !== undefined) {
+        nextQuestion = await mard.getNextQuestion(session, signature, step);
+      }
+    }
+
+    res.json({
+      status: true,
+      message: "✅ تم إرسال الإجابة بنجاح",
+      data: {
+        answer_result: result,
+        next_question: nextQuestion || result.question
+          ? result
+          : "❌ لم يتم العثور على سؤال جديد",
+      },
     });
-
-    res.json(result);
   } catch (err) {
-    console.error("❌ خطأ أثناء جلب السؤال التالي:", err.message);
+    console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء التواصل مع Akinator",
+      message: "❌ حدث خطأ أثناء إرسال الإجابة",
       error: err.message,
     });
   }
