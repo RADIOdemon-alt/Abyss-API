@@ -1,125 +1,149 @@
-// routes/mard-answer.js
 import express from "express";
 import axios from "axios";
 
 const router = express.Router();
 
-/** 🎭 كلاس المارد الأزرق - إرسال الإجابة */
-class MardAnswerAPI {
+class AkinatorAPI {
   constructor() {
-    this.baseUrl = "https://ar.akinator.com";
+    this.base = "https://ar.akinator.com";
     this.headers = {
-      "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Content-Type": "application/x-www-form-urlencoded",
     };
   }
 
-  /** 🔹 إرسال الإجابة */
-  async answer(body) {
-    if (!body || typeof body !== "object" || Object.keys(body).length === 0) {
-      throw new Error("⚠️ لا يوجد بيانات مرسلة في body!");
-    }
+  async answer({ session, signature, step, answer, progression, extra = {} }) {
+    const body = new URLSearchParams({
+      session,
+      signature,
+      step,
+      answer,
+      progression,
+      cm: "false",
+      sid: "NaN",
+      ...extra,
+    });
 
-    try {
-      const { data } = await axios.post(
-        `${this.baseUrl}/answer`,
-        new URLSearchParams(body),
-        { headers: this.headers }
-      );
-      return data;
-    } catch (err) {
-      throw new Error(
-        `فشل تنفيذ answer: ${err.response?.data || err.message}`
-      );
-    }
+    const res = await axios.post(`${this.base}/answer`, body.toString(), {
+      headers: this.headers,
+    });
+    return res.data;
   }
 
-  /** 🔹 جلب السؤال التالي */
-  async getNextQuestion(session, signature, step) {
-    try {
-      const url = `${this.baseUrl}/question?session=${session}&signature=${encodeURIComponent(
-        signature
-      )}&step=${step}`;
-      const { data } = await axios.get(url, { headers: this.headers });
-      return data;
-    } catch (err) {
-      throw new Error(
-        `فشل في جلب السؤال التالي: ${err.response?.data || err.message}`
-      );
-    }
+  async cancelAnswer({ session, signature, step, progression, extra = {} }) {
+    const body = new URLSearchParams({
+      session,
+      signature,
+      step,
+      progression,
+      cm: "false",
+      sid: "NaN",
+      ...extra,
+    });
+
+    const res = await axios.post(`${this.base}/cancel_answer`, body.toString(), {
+      headers: this.headers,
+    });
+    return res.data;
+  }
+
+  // مساعدة لاستخراج نص السؤال من أي استجابة محتملة
+  extractQuestion(data) {
+    if (!data) return null;
+    return (
+      data.question ||
+      data.question_label ||
+      data.questionText ||
+      data.question_text ||
+      (data.questionHTML ? this.stripHtml(data.questionHTML) : null) ||
+      null
+    );
+  }
+
+  stripHtml(html) {
+    return String(html).replace(/<\/?[^>]+(>|$)/g, "").trim();
   }
 }
 
-/** 🧩 POST Route */
-router.post("/", async (req, res) => {
+/** POST /api/mard/answer
+ * Body: { session, signature, step, answer, progression }
+ * يُعيد: السؤال التالي أو نتيجة completion مع الحقل raw
+ */
+router.post("/answer", async (req, res) => {
   try {
-    const mard = new MardAnswerAPI();
-    const result = await mard.answer(req.body);
+    const { session, signature, step, answer, progression } = req.body;
 
-    let nextQuestion = null;
-
-    // 🔹 إذا ما فيه سؤال في الرد أو ظهرت علامة KO، نجيب السؤال التالي
-    if (!result.question || result.completion === "KO") {
-      const { session, signature, step } = req.body;
-      if (session && signature && step !== undefined) {
-        nextQuestion = await mard.getNextQuestion(session, signature, step);
-      }
+    if (!session || !signature || step == null || answer == null) {
+      return res.status(400).json({
+        status: false,
+        message: "⚠️ الحقول المطلوبة: session, signature, step, answer",
+      });
     }
 
-    res.json({
-      status: true,
-      message: "✅ تم إرسال الإجابة بنجاح",
-      data: {
-        answer_result: result,
-        next_question: nextQuestion || result.question
-          ? result
-          : "❌ لم يتم العثور على سؤال جديد",
-      },
+    const api = new AkinatorAPI();
+
+    // 1) نرسل الإجابة أولاً
+    const ansData = await api.answer({ session, signature, step, answer, progression });
+
+    // 2) نحاول استخراج السؤال مباشرة من جواب /answer
+    const nextQ = api.extractQuestion(ansData);
+
+    if (nextQ) {
+      return res.json({
+        status: true,
+        message: "✅ سؤال جديد مستلم من /answer",
+        question: nextQ,
+        raw: ansData,
+      });
+    }
+
+    // 3) إذا جاء completion/guess أعدها مباشرة
+    if (ansData.completion || ansData.guess || ansData.results) {
+      return res.json({
+        status: true,
+        message: "✅ Akinator أعطى نتيجة / completion",
+        type: "completion",
+        data: ansData,
+      });
+    }
+
+    // 4) fallback: نطلب cancel_answer لاسترجاع السؤال الحالي
+    const cancelData = await api.cancelAnswer({ session, signature, step, progression });
+    const canceledQ = api.extractQuestion(cancelData);
+
+    if (canceledQ) {
+      return res.json({
+        status: true,
+        message: "✅ سؤال مسترجع من /cancel_answer (fallback)",
+        question: canceledQ,
+        raw: cancelData,
+      });
+    }
+
+    // 5) لم نتمكن من الحصول على سؤال — أعد الخام للمراجعة
+    return res.status(500).json({
+      status: false,
+      message: "❌ لم يتم الحصول على سؤال من /answer أو /cancel_answer",
+      ansRaw: ansData,
+      cancelRaw: cancelData,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({
+    return res.status(500).json({
       status: false,
-      message: "❌ حدث خطأ أثناء إرسال الإجابة",
+      message: "❌ حدث خطأ أثناء التواصل مع Akinator",
       error: err.message,
+      raw: err.response?.data,
     });
   }
 });
 
-/** 🧩 GET Route (اختياري للاختبار من المتصفح) */
-router.get("/", async (req, res) => {
-  try {
-    const mard = new MardAnswerAPI();
-    const result = await mard.answer(req.query);
-
-    let nextQuestion = null;
-
-    if (!result.question || result.completion === "KO") {
-      const { session, signature, step } = req.query;
-      if (session && signature && step !== undefined) {
-        nextQuestion = await mard.getNextQuestion(session, signature, step);
-      }
-    }
-
-    res.json({
-      status: true,
-      message: "✅ تم إرسال الإجابة بنجاح",
-      data: {
-        answer_result: result,
-        next_question: nextQuestion || result.question
-          ? result
-          : "❌ لم يتم العثور على سؤال جديد",
-      },
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: false,
-      message: "❌ حدث خطأ أثناء إرسال الإجابة",
-      error: err.message,
-    });
-  }
+/** GET /api/mard/answer (للاختبار السريع عبر query params) */
+router.get("/answer", async (req, res) => {
+  // يقبل نفس الحقول كـ query (session, signature, step, answer, progression)
+  req.body = { ...req.body, ...req.query };
+  return router.handle(req, res);
 });
 
 export default router;
