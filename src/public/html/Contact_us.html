@@ -9,8 +9,8 @@
 @import url('https://fonts.cdnfonts.com/css/source-code-pro');
 body {
   font-family: 'Source Code Pro', monospace;
-  background-image: radial-gradient(ellipse at left, #2D193B, #090A20);
-  color: #00e0ff;
+  background-image: radial-gradient(ellipse at left, #2a2a2c, #101010);
+  color: #cfcfcf;
   margin: 0;
   padding: 0;
 }
@@ -20,15 +20,21 @@ body {
   padding: 30px;
   background: rgba(0,0,0,0.7);
   border-radius: 15px;
-  border: 2px solid #00e0ff33;
-  box-shadow: 0 0 25px #00e0ff3f;
+  border: 2px solid #b0b0b033;
+  box-shadow: 0 0 25px #b0b0b03f;
 }
 h1 {
   text-align: center;
   margin-bottom: 30px;
-  text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
+  color: #d6d6d6;
+  text-shadow: 0 0 10px #a0a0a0, 0 0 25px #808080;
 }
-label { display: block; margin-bottom: 6px; font-weight: bold; color: #00e0ff; }
+label { 
+  display: block; 
+  margin-bottom: 6px; 
+  font-weight: bold; 
+  color: #c0c0c0; 
+}
 input, textarea {
   width: 100%;
   padding: 10px;
@@ -37,12 +43,12 @@ input, textarea {
   border-radius: 8px;
   background: rgba(255,255,255,0.05);
   color: #fff;
-  outline: 1px solid rgba(0,224,255,0.3);
+  outline: 1px solid rgba(160,160,160,0.3);
   transition: all 0.3s ease;
 }
 input:focus, textarea:focus {
-  outline: 1px solid #00e0ff;
-  box-shadow: 0 0 10px #00e0ff;
+  outline: 1px solid #b5b5b5;
+  box-shadow: 0 0 10px #a0a0a0;
   transform: scale(1.02);
 }
 button {
@@ -51,17 +57,17 @@ button {
   font-size: 16px;
   font-weight: bold;
   color: #000;
-  background: linear-gradient(135deg, #3a00ff, #7a00b8, #a00028);
+  background: linear-gradient(135deg, #555, #777, #999);
   border: none;
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 0 15px rgba(160, 0, 40, 0.5), 0 0 25px rgba(122, 0, 184, 0.5);
+  box-shadow: 0 0 15px rgba(180, 180, 180, 0.5), 0 0 25px rgba(130, 130, 130, 0.5);
 }
 button:hover {
   transform: scale(1.05) rotate(-1deg);
-  background: linear-gradient(135deg, #4a00ff, #a000ff, #ff0048);
-  box-shadow: 0 0 25px rgba(122,0,255,0.7), 0 0 40px rgba(255,0,80,0.6);
+  background: linear-gradient(135deg, #666, #888, #aaa);
+  box-shadow: 0 0 25px rgba(200,200,200,0.6), 0 0 40px rgba(150,150,150,0.5);
 }
 .msgBox {
   position: fixed;
@@ -72,13 +78,13 @@ button:hover {
   border-radius: 10px;
   background: rgba(0,0,0,0.9);
   color: #fff;
-  border: 1px solid #00e0ff;
-  text-shadow: 0 0 10px #00e0ff;
+  border: 1px solid #b5b5b5;
+  text-shadow: 0 0 10px #b5b5b5;
   display: none;
   z-index: 9999;
 }
-.msgBox.error { border-color: #ff0033; text-shadow: 0 0 10px #ff0033; }
-.msgBox.success { border-color: #00ff66; text-shadow: 0 0 10px #00ff66; }
+.msgBox.error { border-color: #ff5555; text-shadow: 0 0 10px #ff5555; }
+.msgBox.success { border-color: #66ff99; text-shadow: 0 0 10px #66ff99; }
 </style>
 </head>
 <body>
@@ -98,7 +104,7 @@ button:hover {
     <label for="message">Message:</label>
     <textarea id="message" name="message" rows="5" placeholder="Your Message" required></textarea>
 
-    <button type="submit">Send via WhatsApp</button>
+    <button type="submit">Send to WhatsApp</button>
   </form>
 </div>
 
@@ -117,20 +123,14 @@ form.addEventListener('submit', e => {
   const phone = encodeURIComponent(form.phone.value || '—');
   const message = encodeURIComponent(form.message.value);
 
-  // صياغة الرسالة المزخرفة
   const text = `✨ رقم: ${phone}\n✨ الإيميل: ${email}\n✨ الاسم: ${name}\n✨ الرسالة: ${message}`;
-
-  // رابط WhatsApp API
   const url = `https://wa.me/${whatsappNumber}?text=${text}`;
 
-  // فتح WhatsApp Web أو App
   window.open(url, '_blank');
 
-  // إظهار رسالة نجاح
   msgBox.textContent = "✅ Opening WhatsApp...";
   msgBox.className = "msgBox success";
   msgBox.style.display = "block";
-
   setTimeout(() => { msgBox.style.display = "none"; }, 4000);
 });
 </script>
