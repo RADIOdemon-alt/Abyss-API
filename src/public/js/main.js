@@ -80,7 +80,7 @@ document.querySelectorAll(".test-btn").forEach(btn => {
     apiModal.style.display = "flex";
 
     // اكتشاف نوع البراميتر
-    currentParam = baseApi.match(/\?(prompt|url|image|img|imageUrl|imgUrl|lang)=/i)?.[1] || "prompt";
+    currentParam = baseApi.match(/\?(prompt|text|query|url|image|img|imageUrl|imgUrl|lang)=/i)?.[1] || "prompt";
 
     // إظهار/إخفاء حقل الإدخال لو currentParam هو lang
     if (currentParam === "lang") {
@@ -98,6 +98,8 @@ function updateHintText() {
   let msg = "";
   switch (currentParam) {
     case "prompt":
+    case "query":
+    case "text":
       msg = "✏️ هذا النوع يحتاج منك كتابة نص فقط (وليس رابطًا). مثال: 'ولد أنمي يضحك'.";
       break;
     case "url":
