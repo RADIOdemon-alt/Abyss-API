@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dark API</title>
+<title>Dark API Developers</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"/>
 <style>
 @import url('https://fonts.cdnfonts.com/css/source-code-pro');
 
 body {
   font-family: 'Source Code Pro', monospace;
-  background-image: radial-gradient(ellipse at left, #2D193B, #090A20);
-  color: #00e0ff;
+  background: radial-gradient(ellipse at top, #2c2c2c, #0d0d0d);
+  color: #cfcfcf;
   margin: 0;
   padding: 0;
 }
 
+/* ===== Container ===== */
 .container {
   max-width: 1000px;
   margin: 50px auto;
@@ -27,12 +28,12 @@ body {
 
 /* ===== Developer Card ===== */
 .dev-card {
-  background: rgba(0,0,0,0.6);
+  background: rgba(25,25,25,0.9);
   border-radius: 15px;
-  border: 2px solid #00e0ff33;
+  border: 1.5px solid #777;
   width: 320px;
   text-align: center;
-  box-shadow: 0 0 25px #00e0ff3f;
+  box-shadow: 0 0 25px #4a4a4a3f;
   padding-bottom: 20px;
   position: relative;
   overflow: hidden;
@@ -40,38 +41,33 @@ body {
 }
 .dev-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 0 35px #00e0ff80;
+  box-shadow: 0 0 30px #a0a0a040;
 }
 .dev-card .avatar {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  border: 3px solid #00e0ff;
-  margin: 20px auto 10px; /* بدل -60px */
-  box-shadow: 0 0 15px #00e0ff;
+  border: 2px solid #aaa;
+  margin: 20px auto 10px;
+  box-shadow: 0 0 15px #aaa;
   overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
-
 .dev-card .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 .dev-card h2 {
-  color: #00e0ff;
+  color: #e0e0e0;
   margin: 10px 0 5px;
-  text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
+  text-shadow: 0 0 10px #a8a8a8;
 }
 .dev-card p {
-  color: #00e0ffaa;
+  color: #9d9d9d;
   font-size: 14px;
-  margin: 5px 0;
 }
 
+/* ===== Skills ===== */
 .skill {
   text-align: left;
   margin: 10px 20px;
@@ -82,7 +78,7 @@ body {
   font-size: 14px;
 }
 .progress-bar {
-  background: #220022;
+  background: #1e1e1e;
   border-radius: 10px;
   overflow: hidden;
   height: 10px;
@@ -90,7 +86,7 @@ body {
 }
 .progress {
   height: 100%;
-  background: linear-gradient(90deg,#00e0ff,#0077ff);
+  background: linear-gradient(90deg,#bcbcbc,#7f7f7f);
   width: 0;
   animation: fill 1.5s forwards;
 }
@@ -99,30 +95,30 @@ body {
   100% { width: var(--value); }
 }
 
+/* ===== Quotes ===== */
 .dev-card .quote {
   margin-top: 10px;
   font-style: italic;
-  color: #ff80bf;
-  text-shadow: 0 0 6px #ff0099;
+  color: #b6b6b6;
+  text-shadow: 0 0 5px #777;
 }
 
-/* ===== WhatsApp Neon Button Style ===== */
+/* ===== WhatsApp Button ===== */
 .wa-dropdown {
   position: relative;
   width: 230px;
   margin: 15px auto;
 }
-
-.wa-btn.neon-green {
-  background: linear-gradient(135deg, #00ff99, #00cc66);
-  color: #000;
+.wa-btn {
+  background: linear-gradient(135deg, #555, #777);
+  color: #fff;
   font-weight: bold;
   border: none;
   border-radius: 10px;
   padding: 12px 15px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  box-shadow: 0 0 15px #00ff99, 0 0 25px #00ff99 inset;
+  box-shadow: 0 0 15px #666;
   cursor: pointer;
   width: 100%;
   display: flex;
@@ -130,22 +126,18 @@ body {
   align-items: center;
   transition: all 0.3s ease;
 }
-
-.wa-btn.neon-green:hover {
-  background: linear-gradient(135deg, #00cc66, #00ff99);
-  box-shadow: 0 0 25px #00ff99, 0 0 40px #00ff99 inset;
-  transform: translateY(-2px);
+.wa-btn:hover {
+  background: linear-gradient(135deg, #777, #999);
+  box-shadow: 0 0 25px #777;
 }
-
-.wa-btn.neon-green i {
+.wa-btn i {
   transition: transform 0.3s ease;
 }
-
 .wa-dropdown.active .wa-btn i.fas.fa-chevron-down {
   transform: rotate(180deg);
 }
 
-/* ===== Submenu Animation ===== */
+/* ===== Submenu ===== */
 .wa-submenu {
   list-style: none;
   margin: 0;
@@ -155,42 +147,29 @@ body {
   opacity: 0;
   transform: translateY(-10px);
   background: rgba(0,0,0,0.85);
-  border: 1px solid #00ff99;
+  border: 1px solid #777;
   border-radius: 10px;
-  box-shadow: 0 0 15px #00ff99;
+  box-shadow: 0 0 10px #777;
   transition: all 0.4s ease;
 }
-
 .wa-dropdown.active .wa-submenu {
   max-height: 200px;
   opacity: 1;
   transform: translateY(0);
 }
-
 .wa-submenu li a {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px;
-  color: #00ff99;
+  color: #bbb;
   text-decoration: none;
   transition: all 0.3s;
 }
-
 .wa-submenu li a:hover {
-  background: #00ff99;
+  background: #999;
   color: #000;
-  box-shadow: inset 0 0 10px #00ff99;
 }
-
-/* ===== Headings ===== */
-h1, h2 {
-  text-align: center;
-  text-shadow: 0 0 10px #00e0ff, 0 0 25px #0077ff;
-}
-
-h1 { margin-bottom: 40px; }
-h2 { margin-top: 40px; margin-bottom: 20px; }
 
 /* ===== FAQ ===== */
 section {
@@ -198,15 +177,18 @@ section {
   margin: 60px auto;
   padding: 0 20px;
 }
-
+h2 {
+  text-align: center;
+  color: #cfcfcf;
+  text-shadow: 0 0 8px #666;
+}
 .faq-item {
-  background: rgba(0,0,0,0.3);
+  background: rgba(20,20,20,0.6);
   margin-bottom: 12px;
-  border-left: 3px solid #00e0ff;
+  border-left: 3px solid #888;
   border-radius: 5px;
   overflow: hidden;
 }
-
 .faq-question {
   cursor: pointer;
   padding: 12px 15px;
@@ -214,33 +196,26 @@ section {
   justify-content: space-between;
   align-items: center;
   font-weight: bold;
+  color: #ddd;
   transition: background 0.3s;
 }
-
 .faq-question:hover {
-  background: rgba(0,224,255,0.1);
+  background: rgba(160,160,160,0.15);
 }
-
 .faq-answer {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
   padding: 0 15px;
-  color: #9dfffa;
-  border-top: 1px solid rgba(0,224,255,0.2);
+  color: #aaa;
+  border-top: 1px solid rgba(200,200,200,0.2);
   transition: all 0.4s ease;
 }
-
 .faq-item.active .faq-answer {
   max-height: 150px;
   opacity: 1;
   padding: 12px 15px;
 }
-
-.faq-question i {
-  transition: transform 0.3s ease;
-}
-
 .faq-item.active .faq-question i {
   transform: rotate(180deg);
 }
@@ -250,14 +225,14 @@ section {
 
 <div class="container">
 
-  <!-- Radio Demon Card -->
+  <!-- Radio Demon -->
   <div class="dev-card">
-    <div class="avatar"><img src="https://files.catbox.moe/p0adsc.jpg" alt="Radio"></div>
-    <h2>Welcome, I am Radio Demon</h2>
-    <p>Front End Developer</p>
+    <div class="avatar"><img src="https://files.catbox.moe/p0adsc.jpg"></div>
+    <h2>Radio Demon</h2>
+    <p>Front-End & UI Developer</p>
 
     <div class="wa-dropdown">
-      <button class="wa-btn neon-green">
+      <button class="wa-btn">
         <span><i class="fab fa-whatsapp"></i> WhatsApp</span>
         <i class="fas fa-chevron-down"></i>
       </button>
@@ -270,23 +245,20 @@ section {
     <div class="skill">
       <span>HTML 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
       <span>CSS 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
-      <span>JS 90%</span><div class="progress-bar"><div class="progress" style="--value:90%"></div></div>
-      <span>Node 60%</span><div class="progress-bar"><div class="progress" style="--value:60%"></div></div>
-      <span>Express 40%</span><div class="progress-bar"><div class="progress" style="--value:40%"></div></div>
-      <span>React 25%</span><div class="progress-bar"><div class="progress" style="--value:25%"></div></div>
+      <span>JavaScript 90%</span><div class="progress-bar"><div class="progress" style="--value:90%"></div></div>
     </div>
 
-    <div class="quote">Smile my dear… the world is dark, but your code can shine brighter than any demon’s soul!</div>
+    <div class="quote">"Dark themes aren’t just design — they’re an identity."</div>
   </div>
 
-  <!-- IZANA Card -->
+  <!-- IZANA -->
   <div class="dev-card">
-    <div class="avatar"><img src="https://files.catbox.moe/39y65n.jpg" alt="IZANA"></div>
-    <h2>I AM Atomic</h2>
-    <p>Back End Developer</p>
+    <div class="avatar"><img src="https://files.catbox.moe/39y65n.jpg"></div>
+    <h2>Izana</h2>
+    <p>Backend & API Architect</p>
 
     <div class="wa-dropdown">
-      <button class="wa-btn neon-green">
+      <button class="wa-btn">
         <span><i class="fab fa-whatsapp"></i> WhatsApp</span>
         <i class="fas fa-chevron-down"></i>
       </button>
@@ -297,54 +269,48 @@ section {
     </div>
 
     <div class="skill">
-      <span>Node JS 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
-      <span>Axios 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
-      <span>JS 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>Node.js 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>API Systems 100%</span><div class="progress-bar"><div class="progress" style="--value:100%"></div></div>
+      <span>Security 80%</span><div class="progress-bar"><div class="progress" style="--value:80%"></div></div>
     </div>
 
-    <div class="quote">I AM atomic</div>
+    <div class="quote">"Behind every dark API, there’s a brighter mind."</div>
   </div>
 
 </div>
 
 <section>
-  <h2>❓ Frequently Asked Questions</h2>
+  <h2>🧠 Developers' FAQ</h2>
 
   <div class="faq-item">
-    <div class="faq-question">Is there a request limit per day? <i class="fas fa-chevron-down"></i></div>
-    <div class="faq-answer">Yes, free accounts have a limit. For unlimited access, you may need a premium plan.</div>
+    <div class="faq-question">How can I get access to Dark API endpoints? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Request access using your verified developer account. Once approved, your API key will be visible in your dashboard.</div>
   </div>
 
   <div class="faq-item">
-    <div class="faq-question">Do I need an API key? <i class="fas fa-chevron-down"></i></div>
-    <div class="faq-answer">Most endpoints require a valid API key. Make sure you include it in your request headers.</div>
+    <div class="faq-question">Can I integrate Dark API into commercial projects? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Yes, commercial integration is allowed under the premium license. Make sure to include the Dark API attribution.</div>
   </div>
 
   <div class="faq-item">
-    <div class="faq-question">How can I use the API? <i class="fas fa-chevron-down"></i></div>
-    <div class="faq-answer">Enter <a href="https://dark-api-x.vercel.app/" style="color:#00e0ff">home page</a> and choose what suits you from APIs.</div>
+    <div class="faq-question">How are rate limits handled? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Default rate limits apply to free tiers. Premium developers can request increased limits via support.</div>
   </div>
 
   <div class="faq-item">
-    <div class="faq-question">What if I get a 500 error? <i class="fas fa-chevron-down"></i></div>
-    <div class="faq-answer">Retry after a few seconds. If it persists, contact support.</div>
+    <div class="faq-question">Where can I find API documentation? <i class="fas fa-chevron-down"></i></div>
+    <div class="faq-answer">Full endpoint documentation is available at <a href="https://dark-api-x.vercel.app/" style="color:#aaa">Dark API Docs</a>.</div>
   </div>
 </section>
 
 <script>
-document.querySelectorAll('.wa-dropdown').forEach(drop => {
-  drop.querySelector('.wa-btn').addEventListener('click', () => {
-    drop.classList.toggle('active');
-  });
+document.querySelectorAll('.wa-dropdown').forEach(drop=>{
+  drop.querySelector('.wa-btn').addEventListener('click',()=>drop.classList.toggle('active'));
 });
-
-document.querySelectorAll('.faq-item').forEach(item => {
-  const question = item.querySelector('.faq-question');
-  question.addEventListener('click', () => {
-    item.classList.toggle('active');
-  });
+document.querySelectorAll('.faq-item').forEach(item=>{
+  item.querySelector('.faq-question').addEventListener('click',()=>item.classList.toggle('active'));
 });
 </script>
 
 </body>
-</html>l
+</html>
