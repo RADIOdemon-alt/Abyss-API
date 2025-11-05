@@ -1,20 +1,20 @@
+// routes/instagram.js
 import express from "express";
 import axios from "axios";
-import * as cheerio from "cheerio";
+import cheerio from "cheerio";
 
 const router = express.Router();
 
 const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36";
 
 const COMMON_HEADERS = {
   "User-Agent": USER_AGENT,
-  "Accept-Language": "ar,en;q=0.9",
-  "X-Requested-With": "XMLHttpRequest",
-  "Referer": "https://www.instagram.com/",
-  "Origin": "https://www.instagram.com",
+  "Accept-Language": "ar,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+  "X-Requested-With": "mark.via.gp",
 };
 
+// 🔸 أدوات الكوكيز
 function parseSetCookie(setCookieArray = []) {
   const jar = {};
   for (const s of setCookieArray) {
@@ -41,119 +41,185 @@ function cookieHeaderFromJar(jar) {
     .join("; ");
 }
 
-async function waitForResult(jobId, cookieJar, maxTries = 20) {
+async function waitForResult(jobId, cookieJar, maxTries = 15) {
   for (let i = 0; i < maxTries; i++) {
-    try {
-      const rres = await axios.get(
-        `https://instag.com/api/result/?job_id=${encodeURIComponent(jobId)}`,
-        {
-          headers: {
-            ...COMMON_HEADERS,
-            Cookie: cookieHeaderFromJar(cookieJar),
-          },
-          timeout: 20000,
-          validateStatus: (s) => s < 500,
-        }
-      );
-      if (rres.status === 200 && rres.data && rres.data.loading !== true) {
-        return rres.data;
+    const res = await axios.get(
+      `https://instag.com/api/result/?job_id=${encodeURIComponent(jobId)}`,
+      {
+        headers: {
+          ...COMMON_HEADERS,
+          Cookie: cookieHeaderFromJar(cookieJar),
+        },
+        timeout: 20000,
+        validateStatus: (s) => s < 500,
       }
-    } catch (err) {}
+    );
+    if (res.status === 200 && res.data && res.data.loading !== true) {
+      return res.data;
+    }
     await new Promise((r) => setTimeout(r, 2000));
   }
   return null;
 }
 
-async function fetchInstaMedia(url) {
-  if (!url) throw new Error("الرابط غير صالح");
+class InstagramDownloader {
+  async fetchMedia(url) {
+    const cookieJar = {};
+    let csrf = null;
 
-  const urlMatch = url.match(/https?:\/\/(www\.)?instagram\.com\/[^\s]+/i);
-  if (!urlMatch) throw new Error("ضع رابط إنستاجرام صحيح");
+    // 🌀 الخطوة 1: فتح الصفحة الرئيسية
+    const homeRes = await axios.get("https://instag.com/", {
+      headers: { ...COMMON_HEADERS, Referer: "https://www.google.com/" },
+      timeout: 15000,
+      validateStatus: (s) => s < 500,
+    });
+    mergeJars(cookieJar, parseSetCookie(homeRes.headers["set-cookie"] || []));
+    const homeHtml = homeRes.data || "";
+    const m1 = homeHtml.match(
+      /name=["']csrfmiddlewaretoken["']\s+value=["']([^"']+)["']/i
+    );
+    if (m1) csrf = m1[1];
+    if (!csrf && cookieJar.csrftoken) csrf = cookieJar.csrftoken;
 
-  const targetUrl = urlMatch[0];
-  const cookieJar = {};
+    // 🌀 الخطوة 2: إرسال رابط الإنستجرام
+    const params = new URLSearchParams();
+    if (csrf) params.append("csrfmiddlewaretoken", csrf);
+    params.append("url", url);
 
-  const homeRes = await axios.get("https://instag.com/", {
-    headers: { ...COMMON_HEADERS, Referer: "https://www.google.com/" },
-    timeout: 15000,
-    validateStatus: (s) => s < 500,
-  });
+    const managerRes = await axios.post(
+      "https://instag.com/api/manager/",
+      params.toString(),
+      {
+        headers: {
+          ...COMMON_HEADERS,
+          Referer: "https://instag.com/",
+          Origin: "https://instag.com",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          Cookie: cookieHeaderFromJar(cookieJar),
+        },
+        timeout: 20000,
+        validateStatus: (s) => s < 500,
+      }
+    );
+    mergeJars(cookieJar, parseSetCookie(managerRes.headers["set-cookie"] || []));
 
-  mergeJars(cookieJar, parseSetCookie(homeRes.headers["set-cookie"] || []));
-  const homeHtml = homeRes.data || "";
-
-  let csrf = null;
-  const m1 = homeHtml.match(/name=["']csrfmiddlewaretoken["']\s+value=["']([^"']+)["']/i);
-  if (m1) csrf = m1[1];
-  if (!csrf && cookieJar.csrftoken) csrf = cookieJar.csrftoken;
-
-  const params = new URLSearchParams();
-  if (csrf) params.append("csrfmiddlewaretoken", csrf);
-  params.append("url", targetUrl);
-
-  const managerRes = await axios.post("https://instag.com/api/manager/", params.toString(), {
-    headers: {
-      ...COMMON_HEADERS,
-      Referer: "https://instag.com/",
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      Cookie: cookieHeaderFromJar(cookieJar),
-    },
-    timeout: 20000,
-    validateStatus: (s) => s < 500,
-  });
-
-  mergeJars(cookieJar, parseSetCookie(managerRes.headers["set-cookie"] || []));
-
-  const data = managerRes.data;
-  let jobId = null;
-  if (typeof data === "object") jobId = data.job_id || (data.job_ids?.[0]?.job_id) || data.id;
-  else if (typeof data === "string") {
-    const mj = data.match(/"job_id":"([^"]+)"/i);
-    if (mj) jobId = mj[1];
-  }
-  if (!jobId) throw new Error("لم أجد job_id");
-
-  const resultData = await waitForResult(jobId, cookieJar, 20);
-  if (!resultData) throw new Error("لم أجد نتيجة بعد الانتظار");
-
-  let mediaUrl = null;
-  if (resultData.html) {
-    const $ = cheerio.load(resultData.html);
-    const proxy = $("a[href*='/proxy-image/']").first().attr("href");
-    if (proxy) mediaUrl = "https://instag.com" + proxy;
-    else {
-      const imgApi = $("a[href*='/api/image/']").first().attr("href");
-      if (imgApi) mediaUrl = "https://instag.com" + imgApi;
+    // 🌀 استخراج job_id
+    let jobId = null;
+    const data = managerRes.data;
+    if (data?.job_id) jobId = data.job_id;
+    else if (Array.isArray(data?.job_ids) && data.job_ids[0]?.job_id)
+      jobId = data.job_ids[0].job_id;
+    else if (data?.id) jobId = data.id;
+    else if (typeof data === "string") {
+      const mj = data.match(/"job_id":"([^"]+)"/i);
+      if (mj) jobId = mj[1];
     }
-    if (!mediaUrl) {
-      const link = $("a[href^='http']").first().attr("href");
-      if (link) mediaUrl = link;
-    }
-  }
-  if (!mediaUrl) throw new Error("لا يوجد رابط ميديا");
 
-  return {
-    status: true,
-    message: "تم جلب ميديا إنستجرام بنجاح",
-    source_url: targetUrl,
-    download_url: mediaUrl,
-  };
+    if (!jobId) throw new Error("لم يتم العثور على job_id");
+
+    // 🌀 انتظار النتيجة
+    const resultData = await waitForResult(jobId, cookieJar, 15);
+    if (!resultData) throw new Error("لم يتم الحصول على نتيجة بعد الانتظار");
+
+    // 🌀 استخراج رابط الميديا
+    let mediaUrl = null;
+    if (resultData.html) {
+      const $ = cheerio.load(resultData.html);
+      const proxy = $("a[href*='/proxy-image/']").first().attr("href");
+      if (proxy) mediaUrl = "https://instag.com" + proxy;
+      if (!mediaUrl) {
+        const imgApi = $("a[href*='/api/image/']").first().attr("href");
+        if (imgApi) mediaUrl = "https://instag.com" + imgApi;
+      }
+      if (!mediaUrl) {
+        const link = $("a[href^='http']").first().attr("href");
+        if (link) mediaUrl = link;
+      }
+    }
+
+    if (!mediaUrl) throw new Error("لم يتم العثور على رابط الميديا");
+
+    // 🌀 تحميل الملف فعلياً
+    const fileRes = await axios.get(mediaUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent": USER_AGENT,
+        Referer: "https://www.instagram.com/",
+      },
+      timeout: 30000,
+    });
+
+    return {
+      mediaUrl,
+      mimeType: fileRes.headers["content-type"] || "application/octet-stream",
+      base64: Buffer.from(fileRes.data).toString("base64"),
+    };
+  }
 }
 
-// **GET فقط**
+/* 🧩 POST Route */
+router.post("/", async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || !/^https?:\/\/(www\.)?instagram\.com\//i.test(url)) {
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ ضع رابط إنستجرام صحيح." });
+    }
+
+    const insta = new InstagramDownloader();
+    const result = await insta.fetchMedia(url);
+
+    res.json({
+      status: true,
+      message: "✅ تم جلب الميديا بنجاح",
+      data: {
+        url,
+        mediaUrl: result.mediaUrl,
+        mimeType: result.mimeType,
+        base64: result.base64,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء تحميل الميديا",
+      error: err.message,
+    });
+  }
+});
+
+/* 🧩 GET Route */
 router.get("/", async (req, res) => {
   try {
     const url = req.query.url;
-    if (!url) return res.status(400).json({ status: false, error: "يرجى إدخال الرابط." });
+    if (!url || !/^https?:\/\/(www\.)?instagram\.com\//i.test(url)) {
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ ضع رابط إنستجرام صحيح." });
+    }
 
-    const result = await fetchInstaMedia(url);
+    const insta = new InstagramDownloader();
+    const result = await insta.fetchMedia(url);
+
     res.json({
       status: true,
-      creator: "Dark-Team",
-      data: result,
+      message: "✅ تم جلب الميديا بنجاح",
+      data: {
+        url,
+        mediaUrl: result.mediaUrl,
+        mimeType: result.mimeType,
+        base64: result.base64,
+      },
     });
   } catch (err) {
-    res.status(500).json({ status: false, error: err.message });
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء تحميل الميديا",
+      error: err.message,
+    });
   }
 });
 
