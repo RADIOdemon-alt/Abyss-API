@@ -1,208 +1,187 @@
+// gridplus-router.js
 import express from "express";
 import axios from "axios";
 import crypto from "crypto";
+import FormData from "form-data";
+import { fileTypeFromBuffer } from "file-type";
 
 const router = express.Router();
 
-class DeepFakeAPI {
+/* 🧩 GridPlus API Client */
+class GridPlusAPI {
   constructor() {
-    this.baseURL = "https://apiv1.deepfakemaker.io/api";
-    this.headers = {
-      "Content-Type": "application/json",
-      "User-Agent": "Mozilla/5.0 (Android 15; Mobile; rv:130.0) Gecko/130.0 Firefox/130.0",
-      "Referer": "https://deepfakemaker.io/nano-banana-ai/"
-    };
-    this.publicKey = `-----BEGIN PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDa2oPxMZe71V4dw2r8rHWt59gH
-W5INRmlhepe6GUanrHykqKdlIB4kcJiu8dHC/FJeppOXVoKz82pvwZCmSUrF/1yr
-rnmUDjqUefDu8myjhcbio6CnG5TtQfwN2pz3g6yHkLgp8cFfyPSWwyOCMMMsTU9s
-snOjvdDb4wiZI8x3UwIDAQAB
------END PUBLIC KEY-----`;
-    this.secretString = "NHGNy5YFz7HeFb";
-    this.appId = "ai_df";
+    this.api = axios.create({
+      baseURL: "https://api.grid.plus/v1",
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Android 15; Mobile; SM-F958; rv:130.0) Gecko/130.0 Firefox/130.0",
+        "X-AppID": "808645",
+        "X-Platform": "h5",
+        "X-Version": "8.9.7",
+        "X-SessionToken": "",
+        "X-UniqueID": this.uid(),
+        "X-GhostID": this.uid(),
+        "X-DeviceID": this.uid(),
+        "X-MCC": "id-ID",
+        sig: `XX${this.uid() + this.uid()}`,
+      },
+    });
   }
 
-  aesEncrypt(data, key, iv) {
-    const cipher = crypto.createCipheriv("aes-128-cbc", Buffer.from(key), Buffer.from(iv));
-    let encrypted = cipher.update(data, "utf8", "base64");
-    encrypted += cipher.final("base64");
-    return encrypted;
+  uid() {
+    return crypto.randomUUID().replace(/-/g, "");
   }
 
-  generateRandomString(length) {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    const randomBytes = crypto.randomBytes(length);
-    return Array.from(randomBytes, b => chars[b % chars.length]).join("");
+  form(data) {
+    const form = new FormData();
+    Object.entries(data).forEach(([key, value]) => form.append(key, String(value)));
+    return form;
   }
 
-  generateAuth() {
-    const t = Math.floor(Date.now() / 1000).toString();
-    const nonce = crypto.randomUUID();
-    const tempAesKey = this.generateRandomString(16);
-    const encryptedData = crypto.publicEncrypt(
-      { key: this.publicKey, padding: crypto.constants.RSA_PKCS1_PADDING },
-      Buffer.from(tempAesKey)
+  async upload(buffer, method = "wn_aistyle_nano") {
+    if (!Buffer.isBuffer(buffer)) throw new Error("❌ Invalid buffer data");
+
+    const { mime, ext } = (await fileTypeFromBuffer(buffer)) || {};
+    if (!ext || !mime) throw new Error("❌ Could not detect file type");
+
+    const response = await this.api.post(
+      "/ai/web/nologin/getuploadurl",
+      this.form({ ext, method })
     );
-    const secret_key = encryptedData.toString("base64");
-    const sign = this.aesEncrypt(
-      `${this.appId}:${this.secretString}:${t}:${nonce}:${secret_key}`,
-      tempAesKey,
-      tempAesKey
-    );
-    return { app_id: this.appId, t, nonce, sign, secret_key };
-  }
+    const uploadData = response.data?.data;
 
-  async getImageBuffer(imageUrl) {
-    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-    return Buffer.from(response.data);
-  }
-
-  async generateImage({ imageUrl, prompt }) {
-    if (!imageUrl || !prompt) {
-      throw new Error("imageUrl and prompt are required");
-    }
-
-    const authData = this.generateAuth();
-    const userId = this.generateRandomString(64).toLowerCase();
-
-    const instance = axios.create({
-      baseURL: this.baseURL,
-      params: authData,
-      headers: this.headers
+    await axios.put(uploadData.upload_url, buffer, {
+      headers: { "content-type": mime },
     });
 
-    const buffer = await this.getImageBuffer(imageUrl);
+    return uploadData.img_url;
+  }
 
-    // 1️⃣ طلب توقيع رفع الصورة
-    const file = await instance.post("/user/v2/upload-sign", {
-      filename: this.generateRandomString(32) + "_" + Date.now() + ".jpg",
-      hash: crypto.createHash("sha256").update(buffer).digest("hex"),
-      user_id: userId
-    }).then(r => r.data);
+  async pollTask({ path, data, successCheck }) {
+    const start = Date.now();
+    const interval = 3000;
+    const timeout = 60000;
 
-    // 2️⃣ رفع الصورة إلى الرابط الموقع
-    await axios.put(file.data.url, buffer, {
-      headers: { 
-        "content-type": "image/jpeg", 
-        "content-length": buffer.length 
-      }
+    return new Promise((resolve, reject) => {
+      const loop = async () => {
+        if (Date.now() - start > timeout) {
+          return reject(new Error("⏰ Polling timed out"));
+        }
+        try {
+          const res = await this.api({
+            url: path,
+            method: data ? "POST" : "GET",
+            ...(data ? { data } : {}),
+          });
+          const dt = res.data;
+
+          if (dt.errmsg) return reject(new Error(`⚠️ ${dt.errmsg}`));
+          if (successCheck(dt.data)) return resolve(dt.data);
+
+          setTimeout(loop, interval);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      loop();
+    });
+  }
+
+  async editImage(buffer, prompt) {
+    const uploaded = await this.upload(buffer);
+    const task = await this.api.post(
+      "/ai/nano/upload",
+      this.form({ prompt, url: uploaded })
+    );
+
+    const taskId = task.data?.task_id;
+    if (!taskId) throw new Error("❌ task_id not found");
+
+    const result = await this.pollTask({
+      path: `/ai/nano/get_result/${taskId}`,
+      successCheck: (d) => d.code === 0 && !!d.image_url,
     });
 
-    // 3️⃣ إنشاء مهمة التحويل
-    const task = await instance.post("/replicate/v1/free/nano/banana/task", {
-      prompt,
-      platform: "nano_banana",
-      images: [`https://cdn.deepfakemaker.io/${file.data.object_name}`],
-      output_format: "png",
-      user_id: userId
-    }).then(r => r.data);
-
-    // 4️⃣ متابعة التقدم
-    let resultUrl = null;
-    for (let i = 0; i < 20; i++) {
-      const check = await instance.get("/replicate/v1/free/nano/banana/task", {
-        params: { user_id: userId, ...task.data }
-      }).then(r => r.data);
-
-      if (check.msg === "success" && check.data.generate_url) {
-        resultUrl = check.data.generate_url;
-        break;
-      }
-      await new Promise(r => setTimeout(r, 2500));
-    }
-
-    return resultUrl;
+    return result.image_url;
   }
 }
 
-/** 🧩 POST Route */
+/* 🧩 Helper to fetch image as Buffer */
+async function fetchImageAsBuffer(url) {
+  const res = await axios.get(url, { responseType: "arraybuffer" });
+  return Buffer.from(res.data);
+}
+
+/* ------------------- 🧠 ROUTES ------------------- */
+
+/** 🧩 POST /gridplus
+ * Body: { prompt: "وصف الصورة", imageUrl: "https://..." }
+ */
 router.post("/", async (req, res) => {
   try {
-    const { imageUrl, prompt } = req.body;
-
-    if (!imageUrl) {
-      return res.status(400).json({ 
-        status: false, 
-        message: "⚠️ رابط الصورة مطلوب (imageUrl)" 
-      });
-    }
-
+    const { prompt, imageUrl } = req.body;
     if (!prompt) {
-      return res.status(400).json({ 
-        status: false, 
-        message: "⚠️ الوصف مطلوب (prompt)" 
-      });
+      return res.status(400).json({ status: false, message: "⚠️ النص مطلوب (prompt)" });
+    }
+    if (!imageUrl) {
+      return res.status(400).json({ status: false, message: "⚠️ رابط الصورة مطلوب (imageUrl)" });
     }
 
-    const deepfake = new DeepFakeAPI();
-    const resultUrl = await deepfake.generateImage({ imageUrl, prompt });
+    const buffer = await fetchImageAsBuffer(imageUrl);
+    const grid = new GridPlusAPI();
+    const resultUrl = await grid.editImage(buffer, prompt);
 
-    if (!resultUrl) {
-      return res.status(500).json({ 
-        status: false, 
-        message: "❌ فشل في الحصول على النتيجة" 
-      });
-    }
-
-    res.json({ 
-      status: true, 
-      message: "✅ تم تعديل الصورة بنجاح", 
+    res.json({
+      status: true,
+      message: "✅ تم تعديل الصورة بنجاح",
       result: resultUrl,
-      prompt 
     });
-
   } catch (err) {
     console.error(err);
-    res.status(500).json({ 
-      status: false, 
-      message: "❌ حدث خطأ أثناء تعديل الصورة", 
-      error: err.message 
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء معالجة الصورة",
+      error: err.message,
     });
   }
 });
 
-/** 🧩 GET Route */
+/** 🧩 GET /gridplus?prompt=...&imageUrl=...
+ * Supports multiple image URLs separated by comma
+ */
 router.get("/", async (req, res) => {
   try {
-    const { imageUrl, prompt } = req.query;
+    const prompt = req.query.prompt;
+    let imageUrl = req.query.imageUrl;
 
-    if (!imageUrl) {
-      return res.status(400).json({ 
-        status: false, 
-        message: "⚠️ رابط الصورة مطلوب (imageUrl)" 
-      });
+    if (!prompt)
+      return res.status(400).json({ status: false, message: "⚠️ النص مطلوب (prompt)" });
+
+    if (!imageUrl)
+      return res.status(400).json({ status: false, message: "⚠️ رابط الصورة مطلوب (imageUrl)" });
+
+    if (typeof imageUrl === "string") imageUrl = imageUrl.split(",");
+
+    const grid = new GridPlusAPI();
+
+    const results = [];
+    for (const url of imageUrl) {
+      const buffer = await fetchImageAsBuffer(url);
+      const edited = await grid.editImage(buffer, prompt);
+      results.push(edited);
     }
 
-    if (!prompt) {
-      return res.status(400).json({ 
-        status: false, 
-        message: "⚠️ الوصف مطلوب (prompt)" 
-      });
-    }
-
-    const deepfake = new DeepFakeAPI();
-    const resultUrl = await deepfake.generateImage({ imageUrl, prompt });
-
-    if (!resultUrl) {
-      return res.status(500).json({ 
-        status: false, 
-        message: "❌ فشل في الحصول على النتيجة" 
-      });
-    }
-
-    res.json({ 
-      status: true, 
-      message: "✅ تم تعديل الصورة بنجاح", 
-      result: resultUrl,
-      prompt 
+    res.json({
+      status: true,
+      message: "✅ تم تعديل الصور بنجاح",
+      results,
     });
-
   } catch (err) {
     console.error(err);
-    res.status(500).json({ 
-      status: false, 
-      message: "❌ حدث خطأ أثناء تعديل الصورة", 
-      error: err.message 
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء معالجة الصورة",
+      error: err.message,
     });
   }
 });
