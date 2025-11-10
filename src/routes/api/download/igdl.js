@@ -1,7 +1,7 @@
 // 📦 Import Dependencies
 import express from "express";
 import axios from "axios";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import qs from "qs";
 
 const router = express.Router();
