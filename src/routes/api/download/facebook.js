@@ -1,4 +1,4 @@
-baseHeaders express from "express";
+import express from "express";
 import axios from "axios";
 
 const router = express.Router();
@@ -19,7 +19,7 @@ class FacebookDownloader {
     if (!url || !url.includes("https://"))
       throw new Error("رابط فيسبوك غير صالح أو مفقود");
 
-    // 🔹 الخطوة 1: محاولة استخراج videoId
+    // 🔹 استخراج videoId
     const fr = await axios.head(url, { headers: this.baseHeaders });
     const linkHeader = fr.headers["link"];
     const match = linkHeader ? linkHeader.match(/\/(\d+)\/>;/) : null;
@@ -30,7 +30,7 @@ class FacebookDownloader {
         "تعذر استخراج معرف الفيديو. الرابط قد يكون خاصًا أو غير صالح."
       );
 
-    // 🔹 الخطوة 2: تحضير بيانات GraphQL
+    // 🔹 تحضير بيانات GraphQL
     const body_obj = {
       caller: "TAHOE",
       entityNumber: 5,
@@ -55,7 +55,7 @@ class FacebookDownloader {
       doc_id: "23880857301547365",
     });
 
-    // 🔹 الخطوة 3: إرسال الطلب إلى Facebook GraphQL
+    // 🔹 إرسال الطلب
     const res = await axios.post(
       "https://www.facebook.com/api/graphql/",
       body.toString(),
