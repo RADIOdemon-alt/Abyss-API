@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(express.json());
 
 const SITE_BASE = "https://traidmode.com";
-const MAX_SEND_BYTES = 250 * 1024 * 1024; // 250 MB
+const MAX_SEND_BYTES = 1024 * 1024 * 1024; // 250 MB
 
 class TraidModeAPI {
   constructor() {
