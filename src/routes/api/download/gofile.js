@@ -14,7 +14,7 @@ class GofileAPI {
     this.token = "61GsqPG6GvISx1LSIkt3rwQhkcdXqBFY";
 
     this.headers = {
-      "Authorization": `Bearer ${this.token}`,
+      Authorization: `Bearer ${this.token}`,
       "content-type": "application/json; charset=utf-8",
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
@@ -41,12 +41,31 @@ class GofileAPI {
     return res.data.data;
   }
 
-  /** تحميل ملف واحد */
+  /** تحميل ملف واحد + تحديد الامتداد الصحيح */
   async downloadFile(url, filename) {
     const dl = await axios.get(url, {
       responseType: "arraybuffer",
       headers: this.headers,
     });
+
+    // استخراج نوع الملف الحقيقي
+    const mime = dl.headers["content-type"] || "application/octet-stream";
+
+    const extMap = {
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/webp": ".webp",
+      "image/gif": ".gif",
+      "video/mp4": ".mp4",
+      "audio/mpeg": ".mp3",
+      "application/pdf": ".pdf",
+    };
+
+    const ext = extMap[mime] || path.extname(filename) || ".bin";
+
+    // تحديث الاسم لو كان file.bin
+    if (filename === "file.bin") filename = "file" + ext;
+    else if (!filename.includes(".")) filename += ext;
 
     const filePath = path.join("/tmp", filename);
     fs.writeFileSync(filePath, dl.data);
@@ -62,11 +81,17 @@ class GofileAPI {
 router.post("/", async (req, res) => {
   try {
     const { url } = req.body;
-    if (!url) return res.status(400).json({ status: false, message: "⚠️ الرابط مطلوب" });
+    if (!url)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ الرابط مطلوب" });
 
     const api = new GofileAPI();
     const code = api.extractCode(url);
-    if (!code) return res.status(400).json({ status: false, message: "⚠️ رابط غير صالح" });
+    if (!code)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ رابط غير صالح" });
 
     const folder = await api.getFolder(code);
 
@@ -87,12 +112,16 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ status: false, message: "❌ حدث خطأ", error: err.message });
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ",
+      error: err.message,
+    });
   }
 });
 
 /* ----------------------------------------------------
- * 🟦 GET /gofile/download?id=FILE_ID&code=FOLDER_CODE
+ * 🟦 GET /gofile/download?link=...&name=...
  * → يرجع الملف مباشرة
  * ---------------------------------------------------- */
 router.get("/download", async (req, res) => {
@@ -100,34 +129,47 @@ router.get("/download", async (req, res) => {
     const { link, name } = req.query;
 
     if (!link || !name)
-      return res.status(400).json({ status: false, message: "⚠️ link و name مطلوبين" });
+      return res.status(400).json({
+        status: false,
+        message: "⚠️ link و name مطلوبين",
+      });
 
     const api = new GofileAPI();
     const filePath = await api.downloadFile(link, name);
 
-    res.download(filePath, name, (err) => {
+    res.download(filePath, name, () => {
       try {
         fs.unlinkSync(filePath);
       } catch {}
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ status: false, message: "❌ فشل التحميل", error: err.message });
+    res.status(500).json({
+      status: false,
+      message: "❌ فشل التحميل",
+      error: err.message,
+    });
   }
 });
 
 /* ----------------------------------------------------
  * 🟧 GET /gofile?url=...
- * نسخة GET من المسار الأول
+ * نسخة GET من POST
  * ---------------------------------------------------- */
 router.get("/", async (req, res) => {
   try {
     const url = req.query.url;
-    if (!url) return res.status(400).json({ status: false, message: "⚠️ الرابط مطلوب" });
+    if (!url)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ الرابط مطلوب" });
 
     const api = new GofileAPI();
     const code = api.extractCode(url);
-    if (!code) return res.status(400).json({ status: false, message: "⚠️ رابط غير صالح" });
+    if (!code)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ رابط غير صالح" });
 
     const folder = await api.getFolder(code);
 
@@ -148,7 +190,11 @@ router.get("/", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ status: false, message: "❌ حدث خطأ", error: err.message });
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ",
+      error: err.message,
+    });
   }
 });
 
