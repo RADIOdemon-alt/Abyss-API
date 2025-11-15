@@ -5,6 +5,9 @@ import JSZip from "jszip";
 
 const router = express.Router();
 
+// لتمكين قراءة JSON في POST داخل الروتر (إن لم يكن موجود في app الرئيسي)
+router.use(express.json());
+
 const SITE_BASE = "https://traidmode.com";
 const MAX_SEND_BYTES = 250 * 1024 * 1024; // 250 MB
 
@@ -31,7 +34,6 @@ class TraidModeAPI {
     ];
   }
 
-  // حلل الرابط وطبق فلتر المسارات والعناوين
   resolveAndFilter(href, titleRaw = "") {
     try {
       if (!href || href === "#" || href.trim().length === 0) return null;
@@ -45,24 +47,25 @@ class TraidModeAPI {
       const pathname = urlObj.pathname.replace(/\/+$/, "");
       const title = (titleRaw || "").toString().trim();
       const lowerPath = pathname.toLowerCase();
-      // فلترة مسارات عامة
+
       for (const prefix of this.EXCLUDE_PATH_PREFIXES) {
         if (prefix === "/" && (lowerPath === "" || lowerPath === "/")) return null;
         if (prefix !== "/" && lowerPath.startsWith(prefix)) return null;
       }
-      // فلترة كلمات في العنوان
+
       const lowerTitle = title.toLowerCase();
       for (const kw of this.EXCLUDE_TITLE_KEYWORDS) {
         if (lowerTitle.includes(kw)) return null;
       }
-      // استبعاد pagination/tag/category/search
+
       if (lowerPath.includes("/?s=") || lowerPath.includes("/page/") || lowerPath.includes("/tag/") || lowerPath.includes("/category/")) {
         return null;
       }
-      // السماح بروابط خارجية فقط إذا ملف .apk مباشر
+
       if (urlObj.hostname && !urlObj.hostname.includes("traidmode.com") && !urlObj.pathname.toLowerCase().includes(".apk")) {
         return null;
       }
+
       const finalUrl = resolvedUrl;
       const finalTitle = title || finalUrl.split("/").pop().split("?")[0] || finalUrl;
       return { url: finalUrl, title: finalTitle.replace(/\s+/g, " ").trim() };
@@ -71,7 +74,6 @@ class TraidModeAPI {
     }
   }
 
-  // بحث: إرجاع أول نتيجة صالحة (أو رمي خطأ إن لم توجد)
   async searchFirstResult(query) {
     if (!query) throw new Error("⚠️ الحقل 'query' مطلوب");
     const searchUrl = `${this.baseUrl}/?s=${encodeURIComponent(query)}`;
@@ -81,7 +83,6 @@ class TraidModeAPI {
 
     const candidates = [];
 
-    // محاولة التقاط عناصر النتائج المعروفة
     $(".post, article, .search-result, .app-item").each((i, elem) => {
       const $elem = $(elem);
       const link = $elem.find("a").first();
@@ -93,7 +94,6 @@ class TraidModeAPI {
       candidates.push({ title: resolved.title, url: resolved.url, description: description || "" });
     });
 
-    // fallback: مسح كل الروابط الظاهرة
     if (candidates.length === 0) {
       $("a").each((i, elem) => {
         const $a = $(elem);
@@ -115,7 +115,6 @@ class TraidModeAPI {
     return candidates[0];
   }
 
-  // استخراج رابط التحميل المباشر من صفحة النتيجة أو من رابط get
   extractFromGetUrl(getUrl) {
     try {
       const urlObj = new URL(getUrl);
@@ -136,11 +135,11 @@ class TraidModeAPI {
     try {
       if (!pageUrl) throw new Error("صفحة المصدر مطلوبة");
       let url = pageUrl;
-      // لو الرابط يحتوي مباشرة على /get/?urls=
+
       if (url.includes("/get/?urls=")) {
         return this.extractFromGetUrl(url);
       }
-      // جرب الوصول إلى مسار download/ إذا لم يكن موجودًا
+
       if (!url.includes("/download")) url = url.endsWith("/") ? `${url}download/` : `${url}/download/`;
 
       console.log(`🔗 TraidMode: الوصول إلى صفحة التنزيل -> ${url}`);
@@ -172,7 +171,6 @@ class TraidModeAPI {
     }
   }
 
-  // محاولة استعلام HEAD لمعرفة الحجم (إن أمكن)
   async getRemoteFileSize(url) {
     try {
       const head = await axios.head(url, { headers: { "User-Agent": this.headers["user-agent"] || this.headers["User-Agent"], Referer: SITE_BASE }, timeout: 10000 });
@@ -184,13 +182,10 @@ class TraidModeAPI {
   }
 }
 
-// --- دعم لفك ZIP/التأكد من APK (نفس أسلوب Aptoide) ---
 async function extractApkIfZipped(buffer, filename) {
-  // تفقد ترويسة PK لو كان ZIP
-  const isPK = buffer[0] === 0x50 && buffer[1] === 0x4B;
+  // تأكد من طول buffer قبل الوصول لبايتات
+  const isPK = buffer && buffer.length >= 2 && buffer[0] === 0x50 && buffer[1] === 0x4B;
   if (!isPK) {
-    // ربما ملف APK (APK هو ZIP داخلي)، لكن إن لم يكن PK فليس ZIP/APK
-    // حاول فحص وجود علامات APK داخل أول 1000 بايت
     const bufferString = buffer.toString("binary", 0, Math.min(buffer.length, 1000));
     const isDirectApk = bufferString.includes("AndroidManifest") || bufferString.includes("classes.dex") || bufferString.includes("META-INF");
     if (isDirectApk) {
@@ -200,7 +195,6 @@ async function extractApkIfZipped(buffer, filename) {
     throw new Error("❌ الملف المحمّل ليس APK أو ZIP صالح");
   }
 
-  // قد يكون ZIP يحتوي APK بداخل
   try {
     console.log("🔄 محاولة فك ضغط ZIP...");
     const zip = await JSZip.loadAsync(buffer);
@@ -221,18 +215,54 @@ async function extractApkIfZipped(buffer, filename) {
   }
 }
 
+/**
+ * sanitizeFilename:
+ * - يزيل المحارف الخطرة للهيدر
+ * - يرجّع نسخة ASCII آمنة للاستخدام في filename=
+ * - يحتفظ بنسخة UTF-8 مشفرة لاستخدام filename*=
+ */
 function sanitizeFilename(name) {
-  return name.replace(/[^a-zA-Z0-9\u0600-\u06FF\.\-_]/g, "_").slice(0, 240) || "file.apk";
+  if (!name || typeof name !== "string") return "file.apk";
+  // قص طول الاسم للحماية
+  let original = name.trim().slice(0, 240);
+
+  // استبدال محارف التحكم والاقتباسات والباكسلات الخطرة
+  original = original.replace(/[\u0000-\u001f\u007f-\u009f]/g, "_"); // control chars
+  original = original.replace(/["<>:\\/|?*;]/g, "_"); // محارف تمنع في الهيدر
+  original = original.replace(/\s+/g, "_"); // استبدال الفراغات بشرطات سفلية
+
+  // asciiSafe: احتفظ فقط بالرموز ASCII المرئية (20-7E) وإلا استبدل بـ _
+  const asciiSafe = original.replace(/[^\x20-\x7E]/g, "_");
+
+  // أيضاً قسّم الامتداد لو كان متاحًا وحافظ عليه إن كان معروفًا (مثل .apk)
+  // إن لم يكن هناك امتداد واضح، ضيف .apk افتراضياً
+  let ascii = asciiSafe;
+  if (!/\.[a-zA-Z0-9]{1,6}$/.test(ascii)) {
+    // أضف امتداد إذا لم يوجد
+    ascii = ascii + ".apk";
+  }
+
+  // النهائية: ascii و utf8 (الاسم الأصلي الذي سنستخدمه مع urlencode)
+  return {
+    ascii: ascii.slice(0, 200),
+    utf8: original.slice(0, 240)
+  };
+}
+
+function setAttachmentHeaders(res, filenameObj) {
+  // filenameObj: { ascii: "...", utf8: "..." }
+  const ascii = filenameObj.ascii || "file.apk";
+  const utf8 = filenameObj.utf8 || ascii;
+  // نستخدم كل من filename (ASCII) و filename* (UTF-8 percent-encoded)
+  res.setHeader("Content-Disposition",
+    `attachment; filename="${ascii.replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(utf8)}`
+  );
 }
 
 // =====================
 // Routes
 // =====================
 
-/**
- * GET /?query=NAME
- * يبحث عن التطبيق، يختار أول نتيجة، يستخرج رابط التحميل، ينزل الملف ويرجعه كـ attachment
- */
 router.get("/", async (req, res) => {
   try {
     const query = req.query.query;
@@ -240,16 +270,13 @@ router.get("/", async (req, res) => {
 
     const api = new TraidModeAPI();
 
-    // 1) البحث واختيار النتيجة الأولى
     const first = await api.searchFirstResult(query);
 
-    // 2) استخراج رابط التحميل المباشر
     const direct = await api.getDirectDownloadLink(first.url);
     if (!direct || !direct.url) {
       return res.status(404).json({ status: false, message: "⚠️ تعذّر استخراج رابط التحميل المباشر" });
     }
 
-    // 3) تحقق من الحجم بواسطة HEAD
     const remoteSize = await api.getRemoteFileSize(direct.url);
     if (remoteSize && remoteSize > MAX_SEND_BYTES) {
       console.log(`⚠️ الملف كبير: ${(remoteSize / (1024*1024)).toFixed(2)} MB`);
@@ -263,13 +290,13 @@ router.get("/", async (req, res) => {
       });
     }
 
-    // 4) تنزيل الملف
     console.log(`📥 تنزيل من: ${direct.url}`);
     const dlResp = await axios.get(direct.url, {
       responseType: "arraybuffer",
       headers: { "User-Agent": api.headers["user-agent"] || api.headers["User-Agent"], Referer: SITE_BASE },
       timeout: 300000
     });
+
     const buffer = Buffer.from(dlResp.data);
     console.log(`📦 حجم الملف المحمّل: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
 
@@ -285,18 +312,16 @@ router.get("/", async (req, res) => {
       });
     }
 
-    // 5) فك ZIP إن كان ضرورياً
     const defaultFilename = direct.filename || `${first.title}.apk`;
     const { buffer: apkBuffer, filename: apkFilename } = await extractApkIfZipped(buffer, defaultFilename);
 
-    const safeName = sanitizeFilename(apkFilename);
+    const filenameObj = sanitizeFilename(apkFilename || defaultFilename);
+    setAttachmentHeaders(res, filenameObj);
 
-    // 6) ارسال كـ attachment
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
     res.setHeader("Content-Type", "application/vnd.android.package-archive");
     res.setHeader("Content-Length", apkBuffer.length);
 
-    console.log(`✅ إرسال الملف: ${safeName} (${(apkBuffer.length / (1024*1024)).toFixed(2)} MB)`);
+    console.log(`✅ إرسال الملف: ${filenameObj.utf8} (${(apkBuffer.length / (1024*1024)).toFixed(2)} MB)`);
     return res.send(apkBuffer);
 
   } catch (err) {
@@ -305,11 +330,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-/**
- * POST /
- * body: { query: "name" }
- * نفس وظيفة GET لكن عبر body JSON
- */
 router.post("/", async (req, res) => {
   try {
     const { query } = req.body;
@@ -340,6 +360,7 @@ router.post("/", async (req, res) => {
       headers: { "User-Agent": api.headers["user-agent"] || api.headers["User-Agent"], Referer: SITE_BASE },
       timeout: 300000
     });
+
     const buffer = Buffer.from(dlResp.data);
     console.log(`📦 حجم الملف المحمّل: ${(buffer.length / (1024 * 1024)).toFixed(2)} MB`);
 
@@ -356,13 +377,14 @@ router.post("/", async (req, res) => {
 
     const defaultFilename = direct.filename || `${first.title}.apk`;
     const { buffer: apkBuffer, filename: apkFilename } = await extractApkIfZipped(buffer, defaultFilename);
-    const safeName = sanitizeFilename(apkFilename);
 
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    const filenameObj = sanitizeFilename(apkFilename || defaultFilename);
+    setAttachmentHeaders(res, filenameObj);
+
     res.setHeader("Content-Type", "application/vnd.android.package-archive");
     res.setHeader("Content-Length", apkBuffer.length);
 
-    console.log(`✅ إرسال الملف: ${safeName} (${(apkBuffer.length / (1024*1024)).toFixed(2)} MB)`);
+    console.log(`✅ إرسال الملف: ${filenameObj.utf8} (${(apkBuffer.length / (1024*1024)).toFixed(2)} MB)`);
     return res.send(apkBuffer);
 
   } catch (err) {
