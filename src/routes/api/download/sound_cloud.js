@@ -1,76 +1,122 @@
 import express from "express";
-import fetch from "node-fetch";
+import axios from "axios";
 import FormData from "form-data";
 
 const router = express.Router();
 
-// 🔊 دالة تحميل الصوت من SoundCloud
-async function fetchSoundCloud(url) {
-  if (!url || !url.includes("soundcloud.com")) {
-    throw new Error("⚠️ الرابط غير صالح. أرسل رابط SoundCloud صحيح مع الباراميتر url.");
-  }
-
-  const form = new FormData();
-  form.append("url", url);
-  form.append("token", "");
-
-  const response = await fetch("https://scdler.com/wp-json/aio-dl/video-data/", {
-    method: "POST",
-    body: form,
-    headers: {
+class SoundCloudAPI {
+  constructor() {
+    this.baseUrl = "https://scdler.com/wp-json/aio-dl/video-data/";
+    this.headers = {
       "X-Requested-With": "XMLHttpRequest",
-      "Referer": "https://scdler.com/ar/soundcloud-downloader/",
-      "Origin": "https://scdler.com",
-      "User-Agent": "Mozilla/5.0",
-      "Accept": "application/json",
-    },
-  });
-
-  const json = await response.json();
-
-  if (!json || !json.medias || json.medias.length === 0) {
-    throw new Error("❌ فشل التحميل، لم يتم العثور على ملف صوت.");
+      Referer: "https://scdler.com/ar/soundcloud-downloader/",
+      Origin: "https://scdler.com",
+      "User-Agent":
+        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, مثل Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+      Accept: "application/json",
+    };
   }
 
-  const media = json.medias[0];
-  return {
-    title: json.title || "مقطع صوتي",
-    quality: media.quality || "صوت",
-    size: media.size || "غير معروف",
-    audioUrl: media.url,
-    thumbnail: json.thumbnail || null,
-  };
+  /** ▶ تحليل رابط SoundCloud */
+  async fetchData(url) {
+    const form = new FormData();
+    form.append("url", url);
+    form.append("token", "");
+
+    const response = await axios.post(this.baseUrl, form, {
+      headers: { ...this.headers, ...form.getHeaders() },
+    });
+
+    return response.data;
+  }
 }
 
-// 🔹 GET 
-router.get("/", async (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.status(400).json({
-    status: false,
-    message: "ارسل رابط ساوند كلاوند مع url=\nمثل\n\nhttps://dark-api-x.vercel.app/api/v1/download/sound_cloud?url=https://soundcloud.com/scythermane/funk-de-beleza-slowedbelezaslowed"
-  });
-
+/** 🧩 POST Route */
+router.post("/", async (req, res) => {
   try {
-    const result = await fetchSoundCloud(url);
-    res.json({ status: true, ...result, message: "✅ تم العثور على الصوت بنجاح" });
+    const { url } = req.body;
+
+    if (!url || !url.includes("soundcloud.com")) {
+      return res.status(400).json({
+        status: false,
+        message: "⚠️ أرسل رابط صالح من SoundCloud (url)",
+      });
+    }
+
+    const sc = new SoundCloudAPI();
+    const data = await sc.fetchData(url);
+
+    if (!data || !data.medias || data.medias.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: "❌ لم يتم العثور على أي ملف صوت للتحميل",
+      });
+    }
+
+    const media = data.medias[0];
+
+    return res.json({
+      status: true,
+      message: "✅ تم استخراج تفاصيل الصوت بنجاح",
+      result: {
+        title: data.title || "مقطع صوتي",
+        thumbnail: data.thumbnail || null,
+        quality: media.quality || "صوت",
+        size: media.size || "غير معروف",
+        audioUrl: media.url,
+      },
+    });
   } catch (err) {
-    res.status(500).json({ status: false, message: err.message });
+    console.error("SoundCloud API Error:", err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء استخراج الصوت",
+      error: err.message,
+    });
   }
 });
 
-// 🔹 POST 
-router.post("/", async (req, res) => {
-  const url = req.body.url;
-  if (!url) return res.status(400).json({
-    status: false,
-    message: "📌 أرسل رابط SoundCloud في body: { url: '...' }"
-  });
-
+/** 🧩 GET Route */
+router.get("/", async (req, res) => {
   try {
-    const result = await fetchSoundCloud(url);
-    res.json({ status: true, ...result, message: "✅ تم العثور على الصوت بنجاح" });
+    const url = req.query.url;
+
+    if (!url || !url.includes("soundcloud.com")) {
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ رابط SoundCloud مطلوب (url)" });
+    }
+
+    const sc = new SoundCloudAPI();
+    const data = await sc.fetchData(url);
+
+    if (!data || !data.medias || data.medias.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: "❌ لم يتم العثور على ملف صوت.",
+      });
+    }
+
+    const media = data.medias[0];
+
+    res.json({
+      status: true,
+      message: "✅ تم استخراج تفاصيل الصوت",
+      result: {
+        title: data.title,
+        thumbnail: data.thumbnail,
+        quality: media.quality,
+        size: media.size,
+        audioUrl: media.url,
+      },
+    });
   } catch (err) {
-    res.status(500).json({ status: false, message: err.message });
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ خطأ أثناء الاتصال بالخادم",
+      error: err.message,
+    });
   }
 });
 
