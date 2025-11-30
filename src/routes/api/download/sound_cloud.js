@@ -1,216 +1,154 @@
+// 📦 soundcloud.api.js
+// • Developer: izana
+// • Feature: SoundCloud MP3 Downloader (soundcloudmp3.org)
+// • Framework: Express Router style
+
 import express from "express";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { wrapper } from "axios-cookiejar-support";
-import { CookieJar } from "tough-cookie";
 
 const router = express.Router();
 
-class SoundCloudAPI {
-  constructor() {
-    // إنشاء jar للكوكيز لكل طلب
-    this.jar = new CookieJar();
-    this.client = wrapper(axios.create({
-      jar: this.jar,
-      timeout: 30000,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500 // قبول أي استجابة أقل من 500
-    }));
-  }
+/* ----------------------------- إعدادات عامة ----------------------------- */
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, مثل Gecko) Chrome/120.0 Safari/537.36";
 
-  // توليد headers واقعية
-  getBrowserHeaders(referer = null) {
-    const headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
-      "Accept-Encoding": "gzip, deflate, br",
-      "DNT": "1",
-      "Connection": "keep-alive",
-      "Upgrade-Insecure-Requests": "1",
-      "Sec-Fetch-Dest": "document",
-      "Sec-Fetch-Mode": "navigate",
-      "Sec-Fetch-Site": "none",
-      "Sec-Fetch-User": "?1",
-      "Cache-Control": "max-age=0"
-    };
+const COMMON_HEADERS = {
+  "User-Agent": USER_AGENT,
+  "Accept-Language": "ar,en;q=0.9",
+};
 
-    if (referer) {
-      headers["Referer"] = referer;
-      headers["Origin"] = "https://soundcloudmp3.org";
-      headers["Sec-Fetch-Site"] = "same-origin";
-    }
-
-    return headers;
-  }
-
-  async download(url) {
+/* ----------------------------- Cookie Helpers ----------------------------- */
+function parseSetCookie(setCookieArray = []) {
+  const jar = {};
+  for (const s of setCookieArray) {
     try {
-      console.log("🔍 المرحلة 1: جلب الصفحة الرئيسية...");
-      
-      // 1️⃣ زيارة الصفحة الرئيسية أولاً
-      const mainPage = await this.client.get("https://soundcloudmp3.org/", {
-        headers: this.getBrowserHeaders()
-      });
+      const [pair] = s.split(";");
+      const idx = pair.indexOf("=");
+      if (idx > 0) jar[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+    } catch {}
+  }
+  return jar;
+}
 
-      if (mainPage.status === 403) {
-        throw new Error("الموقع يحظر الطلبات. جرب استخدام Proxy أو VPN.");
-      }
+function mergeJars(dest, src) {
+  for (const k of Object.keys(src)) dest[k] = src[k];
+}
 
-      const $ = cheerio.load(mainPage.data);
-      const token = $("input[name='_token']").attr("value");
-      
-      if (!token) {
-        console.error("❌ لم يتم العثور على token. HTML:", mainPage.data.substring(0, 500));
-        throw new Error("فشل استخراج الـ token من الموقع");
-      }
+function cookieHeaderFromJar(jar) {
+  return Object.keys(jar)
+    .map((k) => `${k}=${jar[k]}`)
+    .join("; ");
+}
 
-      console.log("✅ تم استخراج Token:", token.substring(0, 20) + "...");
+/* ----------------------------- كلاس SoundCloud ----------------------------- */
+class SoundCloudScraper {
+  constructor() {
+    this.baseUrl = "https://soundcloudmp3.org";
+  }
 
-      // 2️⃣ انتظار قصير (محاكاة المستخدم الحقيقي)
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+  async fetch(url) {
+    if (!url || !url.includes("soundcloud.com"))
+      throw new Error("❌ رابط SoundCloud غير صالح");
 
-      console.log("🔄 المرحلة 2: إرسال طلب التحويل...");
+    const cookieJar = {};
 
-      // 3️⃣ إرسال طلب التحويل
-      const formData = new URLSearchParams({
-        _token: token,
-        lang: "en",
-        url: url,
-        submit: ""
-      });
+    // ▪ افتح الصفحة الرئيسية لجلب التوكن
+    const homeRes = await axios.get(this.baseUrl + "/", {
+      headers: { ...COMMON_HEADERS },
+      timeout: 15000,
+      validateStatus: (s) => s < 500,
+    });
 
-      const convertResponse = await this.client.post(
-        "https://soundcloudmp3.org/converter",
-        formData.toString(),
-        {
-          headers: {
-            ...this.getBrowserHeaders("https://soundcloudmp3.org/"),
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-Requested-With": "XMLHttpRequest" // مهم جداً!
-          }
-        }
-      );
+    mergeJars(cookieJar, parseSetCookie(homeRes.headers["set-cookie"] || []));
+    const $ = cheerio.load(homeRes.data);
+    const token = $("input").attr("value");
 
-      if (convertResponse.status === 403) {
-        throw new Error("تم حظر طلب التحويل. الموقع يكتشف البوت.");
-      }
+    if (!token) throw new Error("❌ لم يتم استخراج التوكن");
 
-      const $$ = cheerio.load(convertResponse.data);
-      const result = {};
+    // ▪ طلب التحويل
+    const params = new URLSearchParams();
+    params.append("_token", token);
+    params.append("lang", "en");
+    params.append("url", url);
+    params.append("submit", "");
 
-      // 4️⃣ استخراج معلومات الأغنية
-      $$(".info > p").each((i, elem) => {
-        const text = $$(elem).text().trim();
-        const boldText = $$(elem).find("b").text();
-        const key = boldText.split(":")[0].trim().toLowerCase();
-        const value = text.replace(boldText, "").trim();
-        if (key && value) {
-          result[key] = value;
-        }
-      });
+    const convRes = await axios.post(this.baseUrl + "/converter", params.toString(), {
+      headers: {
+        ...COMMON_HEADERS,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: cookieHeaderFromJar(cookieJar),
+      },
+      timeout: 20000,
+    });
 
-      result.thumbnail = $$(".info img").attr("src");
-      result.download = $$("#ready-group a").attr("href");
+    const $$ = cheerio.load(convRes.data);
 
-      if (!result.download) {
-        console.error("❌ لم يتم العثور على رابط التحميل. HTML:", convertResponse.data.substring(0, 500));
-        throw new Error("فشل استخراج رابط التحميل. قد يكون الرابط غير صالح.");
-      }
+    const download = $$("#ready-group a").attr("href");
+    const thumb = $$(".info img").attr("src");
+    const title = $$(".info > p b").first().text().replace("Title:", "").trim();
 
-      console.log("✅ رابط التحميل:", result.download);
+    if (!download) throw new Error("⚠️ لم يتم العثور على رابط التحميل");
 
-      // 5️⃣ انتظار قصير
-      await new Promise(resolve => setTimeout(resolve, 500));
+    // ▪ تحميل الملف
+    const fileRes = await axios.get(download, {
+      responseType: "arraybuffer",
+      headers: { "User-Agent": USER_AGENT },
+      timeout: 30000,
+    });
 
-      console.log("⬇️ المرحلة 3: تحميل الملف الصوتي...");
-
-      // 6️⃣ تحميل الصوت
-      const audioResponse = await this.client.get(result.download, {
-        responseType: "arraybuffer",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer": "https://soundcloudmp3.org/",
-          "Accept": "audio/mpeg,audio/*;q=0.9,*/*;q=0.8"
-        }
-      });
-
-      result.buffer = Buffer.from(audioResponse.data);
-      console.log(`✅ تم تحميل الصوت (${(result.buffer.length / 1024 / 1024).toFixed(2)} MB)`);
-
-      return result;
-    } catch (err) {
-      if (err.response) {
-        console.error("❌ خطأ من السيرفر:", err.response.status, err.response.statusText);
-        console.error("📄 Response data:", err.response.data?.toString().substring(0, 200));
-        
-        if (err.response.status === 403) {
-          throw new Error("403 Forbidden: الموقع يحظر الطلبات. جرب استخدام Proxy.");
-        }
-        throw new Error(`خطأ من السيرفر: ${err.response.status}`);
-      } else if (err.request) {
-        console.error("❌ لم يتم استلام رد من السيرفر");
-        throw new Error("فشل الاتصال بالسيرفر");
-      } else {
-        console.error("❌ خطأ:", err.message);
-        throw new Error(err.message);
-      }
-    }
+    return {
+      status: true,
+      title: title || "SoundCloud Audio",
+      thumbnail: thumb,
+      source: url,
+      contentType: "audio/mpeg",
+      buffer: Buffer.from(fileRes.data),
+    };
   }
 }
 
-/** 🧩 POST Route */
+/* ----------------------------- POST /soundcloud ----------------------------- */
 router.post("/", async (req, res) => {
   try {
     const { url } = req.body;
-    if (!url || !url.includes("soundcloud.com")) {
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ رابط SoundCloud مباشر مطلوب"
-      });
-    }
+    if (!url) return res.status(400).json({ status: false, message: "⚠️ الرابط مطلوب" });
 
-    console.log("📥 طلب POST جديد:", url);
-    const sc = new SoundCloudAPI();
-    const data = await sc.download(url);
+    const sc = new SoundCloudScraper();
+    const audio = await sc.fetch(url);
+
+    const base64 = audio.buffer.toString("base64");
 
     res.json({
       status: true,
-      message: "✅ تم استخراج الصوت بنجاح",
-      title: data.title || "SoundCloud Audio",
-      thumbnail: data.thumbnail || null,
-      base64: data.buffer.toString("base64")
+      message: "✅ تم جلب الصوت بنجاح",
+      title: audio.title,
+      thumbnail: audio.thumbnail,
+      contentType: audio.contentType,
+      source: audio.source,
+      fileBase64: base64,
     });
+
   } catch (err) {
-    console.error("❌ خطأ في POST:", err.message);
+    console.error("SoundCloud Error:", err.message);
     res.status(500).json({ status: false, message: err.message });
   }
 });
 
-/** 🧩 GET Route */
+/* ----------------------------- GET /soundcloud ----------------------------- */
 router.get("/", async (req, res) => {
   try {
-    const url = req.query.url;
-    if (!url || !url.includes("soundcloud.com")) {
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ رابط SoundCloud مباشر مطلوب"
-      });
-    }
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ status: false, message: "⚠️ الرابط مطلوب" });
 
-    console.log("📥 طلب GET جديد:", url);
-    const sc = new SoundCloudAPI();
-    const data = await sc.download(url);
+    const sc = new SoundCloudScraper();
+    const audio = await sc.fetch(url);
 
-    res.json({
-      status: true,
-      message: "✅ تم استخراج الصوت بنجاح",
-      title: data.title || "SoundCloud Audio",
-      thumbnail: data.thumbnail || null,
-      base64: data.buffer.toString("base64")
-    });
+    res.setHeader("Content-Type", audio.contentType);
+    res.send(audio.buffer);
+
   } catch (err) {
-    console.error("❌ خطأ في GET:", err.message);
+    console.error("SoundCloud Error:", err.message);
     res.status(500).json({ status: false, message: err.message });
   }
 });
