@@ -128,7 +128,7 @@ class MusicFull {
 // ====================================================
 
 // ---------------------- POST ------------------------
-router.post("/generate", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { prompt } = req.body;
 
@@ -162,7 +162,7 @@ router.post("/generate", async (req, res) => {
 });
 
 // ---------------------- GET ------------------------
-router.get("/generate", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { prompt } = req.query;
 
