@@ -1,131 +1,197 @@
 import express from "express";
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
 
 const router = express.Router();
 
-// 🌐 إعدادات عامة
-const apiBase = "https://musicai.apihub.today/api/v1";
-const fcmToken =
-  "eqnTqlxMTSKQL5NQz6r5aP:APA91bHa3CvL5Nlcqx2yzqTDAeqxm_L_vIYxXqehkgmTsCXrV29eAak6_jqXv5v1mQrdw4BGMLXl_BFNrJ67Em0vmdr3hQPVAYF8kR7RDtTRHQ08F3jLRRI";
+// ====================================================
+//                🎵 MusicFull CORE
+// ====================================================
+class MusicFull {
+  constructor() {
+    this.reportUrl = "https://account-api.musicful.ai/v2/report-data";
+    this.descUrl =
+      "https://aimusic-api.musicful.ai/musicful/app/v1/async/description-to-song";
+    this.resultUrl =
+      "https://aimusic-api.musicful.ai/musicful/app/v1/song/result";
 
-function getUserHeaders(deviceId, msgId) {
-  const time = Date.now().toString();
-  return {
-    "user-agent": "NB Android/1.0.0",
-    "content-type": "application/json",
-    accept: "application/json",
-    "x-platform": "android",
-    "x-app-version": "1.0.0",
-    "x-country": "ID",
-    "accept-language": "id-ID",
-    "x-client-timezone": "Asia/Jakarta",
-    "x-device-id": deviceId,
-    "x-request-id": msgId,
-    "x-message-id": msgId,
-    "x-request-time": time,
-  };
-}
+    this.key = Buffer.from("147258369topmeidia96385topmeidia", "utf8");
+    this.iv = Buffer.from("1597531topmeidia", "utf8");
 
-// 🔹 إنشاء أو تسجيل مستخدم
-async function registerUser(deviceId, msgId) {
-  const headers = getUserHeaders(deviceId, msgId);
-  const res = await axios.put(
-    `${apiBase}/users`,
-    { deviceId, fcmToken },
-    { headers }
-  );
-  return res.data.id;
-}
+    this.pollInt = 10000;
+    this.pollMax = 30;
 
-// 🔹 إنشاء أغنية
-async function createSong({ userId, title, lyrics, mood, genre, gender }, deviceId, msgId) {
-  const headers = { ...getUserHeaders(deviceId, msgId), "x-client-id": userId };
-  const body = { type: "lyrics", name: title, lyrics };
-  if (mood) body.mood = mood;
-  if (genre) body.genre = genre;
-  if (gender) body.gender = gender;
+    this.code = this.genCode();
+  }
 
-  const res = await axios.post(`${apiBase}/song/create`, body, { headers });
-  return res.data.id;
-}
+  genCode() {
+    return crypto.randomBytes(8).toString("hex");
+  }
 
-// 🔹 التحقق من حالة الأغنية
-async function checkSong(userId, songId, deviceId, msgId) {
-  const headers = { ...getUserHeaders(deviceId, msgId), "x-client-id": userId };
-  const res = await axios.get(`${apiBase}/song/user`, {
-    headers,
-    params: { userId, isFavorite: false, page: 1, searchText: "" },
-  });
-  return res.data.datas.find((s) => s.id === songId) || null;
-}
+  md5(d) {
+    return crypto
+      .createHash("md5")
+      .update(String(d))
+      .digest("hex")
+      .toUpperCase();
+  }
 
-// 🔹 POST /api/suno
-router.post("/", async (req, res) => {
-  const { title, lyrics, mood, type, gender } = req.body;
-  if (!title || !lyrics)
-    return res.status(400).json({ status: false, message: "الرجاء إرسال title و lyrics" });
-
-  try {
-    const deviceId = uuidv4();
-    const msgId = uuidv4();
-
-    const userId = await registerUser(deviceId, msgId);
-    const songId = await createSong({ userId, title, lyrics, mood, genre: type, gender }, deviceId, msgId);
-
-    // poll الأغنية حتى يتم توليد الرابط
-    let found = null;
-    while (!found?.url) {
-      await new Promise((r) => setTimeout(r, 3000));
-      found = await checkSong(userId, songId, deviceId, msgId);
+  decrypt(txt) {
+    try {
+      const buf = Buffer.from(txt, "base64");
+      const dec = crypto.createDecipheriv("aes-256-cbc", this.key, this.iv);
+      return dec.update(buf, null, "utf8") + dec.final("utf8");
+    } catch {
+      return txt;
     }
+  }
+
+  async auth() {
+    const ts = Date.now();
+    const sign = this.md5(this.code + ts + "member_sign");
+
+    const body = new URLSearchParams({
+      software_code: this.code,
+      lang: "AR",
+      source_site: "google_play",
+      information_sources: "200473",
+      operating_type: "phone-app",
+      operating_system: "android",
+      token: "",
+      timestamp: ts.toString(),
+      sign,
+    });
+
+    const { data } = await axios.post(this.reportUrl, body);
+    if (data.code !== 200)
+      throw new Error(data.msg || "فشل تسجيل الدخول إلى Musicful");
+  }
+
+  async reqDesc(desc) {
+    const body = new URLSearchParams({
+      description: desc,
+      instrumental: "0",
+      mv: "v4.0",
+    });
+
+    const { data } = await axios.post(this.descUrl, body, {
+      headers: { "tourist-authorization": `Bearer ${this.code}` },
+    });
+
+    if (data.status !== 200)
+      throw new Error(data.message || "فشل إرسال الوصف");
+
+    return data.data?.ids || [];
+  }
+
+  async poll(ids) {
+    for (let i = 0; i < this.pollMax; i++) {
+      const { data } = await axios.get(
+        `${this.resultUrl}?ids=${ids.join(",")}`,
+        { headers: { "tourist-authorization": `Bearer ${this.code}` } }
+      );
+
+      if (data.status !== 200) throw new Error(data.message);
+
+      const songs = data.data?.result || [];
+
+      const done = songs.every(
+        (s) => s.status === 0 || s.fail_code !== null
+      );
+
+      if (done) return songs;
+
+      await new Promise((r) => setTimeout(r, this.pollInt));
+    }
+
+    throw new Error("⏳ انتهى الوقت ولم تصل النتائج");
+  }
+
+  async generate(prompt) {
+    await this.auth();
+    const ids = await this.reqDesc(prompt);
+    const raw = await this.poll(ids);
+
+    return raw
+      .filter((s) => s.status === 0)
+      .map((s) => ({
+        id: s.id,
+        audio: this.decrypt(s.audio_url || ""),
+        cover: this.decrypt(s.cover_url || ""),
+        lyrics: this.decrypt(s.lyrics || ""),
+      }));
+  }
+}
+
+// ====================================================
+//            🎧 API ROUTES — MusicFull
+// ====================================================
+
+// ---------------------- POST ------------------------
+router.post("/", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ الـ prompt مطلوب" });
+
+    const api = new MusicFull();
+    const result = await api.generate(prompt);
+
+    if (!result.length)
+      return res.json({
+        status: false,
+        message: "❌ لم يتم إنشاء أغنية",
+      });
 
     res.json({
       status: true,
-      song: {
-        id: found.id,
-        name: found.name,
-        url: found.url,
-        status: found.status,
-        thumbnail: found.thumbnail_url,
-      },
+      message: "🎵 تم إنشاء الأغنية بنجاح",
+      data: result[0],
     });
-  } catch (e) {
-    res.status(500).json({ status: false, message: "حدث خطأ أثناء توليد الأغنية", error: e.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء توليد الأغنية",
+      error: err.message,
+    });
   }
 });
 
-// 🔹 GET /api/suno?prompt=...&type=...&mode=...&gender=...
+// ---------------------- GET ------------------------
 router.get("/", async (req, res) => {
-  const { prompt, type, mode, gender } = req.query;
-  if (!prompt)
-    return res.status(400).json({ status: false, message: "الرجاء إرسال prompt" });
-
   try {
-    const deviceId = uuidv4();
-    const msgId = uuidv4();
+    const { prompt } = req.query;
 
-    const userId = await registerUser(deviceId, msgId);
-    const songId = await createSong({ userId, title: prompt, lyrics: prompt, mood: mode, genre: type, gender }, deviceId, msgId);
+    if (!prompt)
+      return res
+        .status(400)
+        .json({ status: false, message: "⚠️ الـ prompt مطلوب" });
 
-    let found = null;
-    while (!found?.url) {
-      await new Promise((r) => setTimeout(r, 3000));
-      found = await checkSong(userId, songId, deviceId, msgId);
-    }
+    const api = new MusicFull();
+    const result = await api.generate(prompt);
+
+    if (!result.length)
+      return res.json({
+        status: false,
+        message: "❌ لم يتم إنشاء أغنية",
+      });
 
     res.json({
       status: true,
-      song: {
-        id: found.id,
-        name: found.name,
-        url: found.url,
-        status: found.status,
-        thumbnail: found.thumbnail_url,
-      },
+      message: "🎵 تم إنشاء الأغنية بنجاح",
+      data: result[0],
     });
-  } catch (e) {
-    res.status(500).json({ status: false, message: "حدث خطأ أثناء توليد الأغنية", error: e.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: false,
+      message: "❌ حدث خطأ أثناء توليد الأغنية",
+      error: err.message,
+    });
   }
 });
 
