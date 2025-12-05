@@ -4,7 +4,7 @@ import axios from "axios";
 const router = express.Router();
 
 // ضع مفتاح API هنا مباشرة
-const ELEVEN_API_KEY = "YOUR_ELEVENLABS_API_KEY";
+const ELEVEN_API_KEY = "sk_efdc5ee0747bb449ad1bfa7776301bd2208b8e77c7fc9a89";
 
 /* -------------------------------------------
 🗣️ قائمة الأصوات (نفس قائمتك بالكامل)
