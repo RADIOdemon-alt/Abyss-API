@@ -1,9 +1,10 @@
 import express from "express";
 import axios from "axios";
-import fs from "fs";
-import path from "path";
 
 const router = express.Router();
+
+// ضع مفتاح API هنا مباشرة
+const ELEVEN_API_KEY = "YOUR_ELEVENLABS_API_KEY";
 
 /* -------------------------------------------
 🗣️ قائمة الأصوات (نفس قائمتك بالكامل)
@@ -35,34 +36,18 @@ const voices = [
   { arName: "فهد", id: "onwK4e9ZLuTAKqWW03F9", desc: "صوت ذكوري رسمي" },
   { arName: "دان", id: "CYw3kZ02Hs0563khs1Fj", desc: "صوت بريطاني شاب" },
   { arName: "ليو", id: "29vD33N1CtxCmqQRPOHJ", desc: "صوت أمريكي حيوي" },
-  { arName: "تيم", id: "g5CIjZEefAph4nQFvHAz", desc: "صوت جريء وواثق" },
-  { arName: "نزار", id: "D38z5RcWu1voky8WS1ja", desc: "صوت مرح ومتفائل" },
-  { arName: "عمر", id: "JBFqnCBsd6RMkjVDRZzb", desc: "صوت عميق ومؤثر" },
-  { arName: "كافا", id: "zcAOhNBS3c14rBihAFp1", desc: "صوت رجولي هادئ" },
-  { arName: "باهر", id: "z9fAnlkpzviPz146aGWa", desc: "صوت ساحر وجذاب" },
-  { arName: "هاني", id: "SOYHLrjzK2X1ezoPC6cr", desc: "صوت أمريكي قوي" },
-  { arName: "جادسون", id: "ZQe5CZNOzWyzPSCn5a3c", desc: "صوت أسترالي هادئ" },
-  { arName: "سيف", id: "Zlb1dXrM653N07WRdFW3", desc: "صوت بريطاني محترف" },
-  { arName: "راكان", id: "TxGEqnHWrfWFTfGW9XjX", desc: "صوت شاب وحيوي" },
-  { arName: "مهند", id: "flq6f7yk4E4fJM5XTYuZ", desc: "صوت أمريكي قوي" },
-  { arName: "كريمون", id: "ODq5zmih8GrVes37Dizd", desc: "صوت أمريكي جنوبي" },
-  { arName: "سندس", id: "yoZ06aMxZJJ28mfd3POQ", desc: "صوت شاب وديناميكي" },
-  { arName: "تيمور", id: "GBv7mTt0atIp3Br8iCZE", desc: "صوت أمريكي شاب" },
 ];
 
 /* -------------------------------------------
 🎧 Class ElevenLabs
 ------------------------------------------- */
 class ElevenLabsTTS {
-  constructor(apiKey) {
-    if (!apiKey) throw new Error("Missing ElevenLabs API Key");
-    this.apiKey = apiKey;
+  constructor() {
+    this.apiKey = ELEVEN_API_KEY;
     this.baseUrl = "https://api.elevenlabs.io/v1/text-to-speech/";
   }
 
   async generate({ voiceId, text }) {
-    if (!voiceId || !text) throw new Error("Missing voiceId or text");
-
     const response = await axios.post(
       `${this.baseUrl}${voiceId}`,
       {
@@ -78,10 +63,8 @@ class ElevenLabsTTS {
       }
     );
 
-    const base64 = Buffer.from(response.data).toString("base64");
-
     return {
-      file: base64,
+      file: Buffer.from(response.data).toString("base64"),
       mimetype: "audio/mpeg",
     };
   }
@@ -95,23 +78,22 @@ router.post("/", async (req, res) => {
     const { voice, text } = req.body;
 
     if (!voice || !text)
-      return res.status(400).json({ status: false, message: "⚠️ ارسل voice و text" });
+      return res.json({ status: false, message: "ارسل voice و text" });
 
     const voiceObj = voices.find(v => v.arName === voice);
     if (!voiceObj)
-      return res.status(404).json({ status: false, message: "❌ الصوت غير موجود" });
+      return res.json({ status: false, message: "الصوت غير موجود" });
 
-    const tts = new ElevenLabsTTS(process.env.ELEVEN_API_KEY);
+    const tts = new ElevenLabsTTS();
     const result = await tts.generate({ voiceId: voiceObj.id, text });
 
     res.json({
       status: true,
-      voice: voice,
+      voice,
       response: `data:audio/mpeg;base64,${result.file}`,
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ status: false, error: err.message });
+  } catch (e) {
+    res.json({ status: false, error: e.message });
   }
 });
 
@@ -123,13 +105,13 @@ router.get("/", async (req, res) => {
     const { voice, text } = req.query;
 
     if (!voice || !text)
-      return res.status(400).json({ status: false, message: "⚠️ ارسل voice و text" });
+      return res.json({ status: false, message: "ارسل voice و text" });
 
     const voiceObj = voices.find(v => v.arName === voice);
     if (!voiceObj)
-      return res.status(404).json({ status: false, message: "❌ الصوت غير موجود" });
+      return res.json({ status: false, message: "الصوت غير موجود" });
 
-    const tts = new ElevenLabsTTS(process.env.ELEVEN_API_KEY);
+    const tts = new ElevenLabsTTS();
     const result = await tts.generate({ voiceId: voiceObj.id, text });
 
     res.json({
@@ -137,23 +119,18 @@ router.get("/", async (req, res) => {
       voice,
       response: `data:audio/mpeg;base64,${result.file}`,
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ status: false, error: err.message });
+  } catch (e) {
+    res.json({ status: false, error: e.message });
   }
 });
 
 /* -------------------------------------------
-📘 عرض قائمة الأصوات
+📘 الأصوات
 ------------------------------------------- */
 router.get("/voices", (req, res) => {
   res.json({
     status: true,
-    voices: voices.map(v => ({
-      name: v.arName,
-      id: v.id,
-      desc: v.desc,
-    })),
+    voices,
   });
 });
 
