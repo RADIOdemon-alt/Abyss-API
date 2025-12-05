@@ -1,157 +1,160 @@
-// plugins/elevenlabs-squinty-api.js
 import express from "express";
 import axios from "axios";
-import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 const router = express.Router();
 
-const voices = {
-  'ادم': 'pNInz6obpgDQGcFmaJgB',
-  'بيلا': 'EXAVITQu4vr4xnSDxMaL',
-  'جوش': 'TxGEqnHWrfWFTfGW9XjX',
-  'ريتشيل': '21m00Tcm4TlvDq8ikWAM',
-  'كلايد': '2EiwWnXFnvU5JabPnv8n',
-  'دومي': 'AZnzlk1XvdvUeBnXmlld',
-  'جوزفين': 'Xb7hH8MSUJpSbSDYk0k2',
-  'سارة': 'EXAVITQu4vr4xnSDxMaL',
-  'كالوم': 'N2lVS1w4EtoT3dr4eOWO',
-  'جورج': 'JBFqnCBsd6RMkjVDRZzb',
-  'باتريك': 'ODq5zmih8GrVes37Dizd',
-  'كريس': 'ZQe5CZNOzWyzPSCn5a3c',
-  'ماتيلدا': 'Xb7hH8MSUJpSbSDYk0k2',
-  'دانيال': 'onwK4e9ZLuTAKqWW03F9',
-  'ريفر': 'VR6AewLTigWG4xSOukaG',
-  'بيل': 'pqHfZKP75CvOlQylNhV4',
-  'تشارلي': 'iP95p4xoKVk53GoZ742B',
-  'كالم': 'N2lVS1w4EtoT3dr4eOWO'
-};
+/* -------------------------------------------
+🗣️ قائمة الأصوات (نفس قائمتك بالكامل)
+------------------------------------------- */
+const voices = [
+  { arName: "ليانا", id: "Xb7hH8MSUJpSbSDYk0k2", desc: "صوت أنثوي واضح ومشرق" },
+  { arName: "ميرال", id: "XB0fDUnXU5powFXDhCwa", desc: "صوت ناعم ودافئ" },
+  { arName: "تاليا", id: "ThT5KcBeYPX3keUQqHPh", desc: "صوت أنثوي مشرق وحيوي" },
+  { arName: "رِنا", id: "LcfcDJNUP1GQjkzn1xUU", desc: "صوت لطيف ومهذب" },
+  { arName: "سيرين", id: "jsCqWAovK2LkecY7zXl4", desc: "صوت ناعم ومتزن" },
+  { arName: "فاي", id: "jBpfuIE2acCO8z3wKNLl", desc: "صوت أنثوي حيوي" },
+  { arName: "ياسمين", id: "oWAxZDx7w5VEj9dCyTzz", desc: "صوت راقي وأنيق" },
+  { arName: "نوفا", id: "t0jbNlBVZ17f02VDIeMI", desc: "صوت شاب ومفعم بالحيوية" },
+  { arName: "آية", id: "pFZP5JQG7iQjIQuC4Bku", desc: "صوت دافئ وحنون" },
+  { arName: "لينا", id: "XrExE9yKIg1WjnnlVkGX", desc: "صوت بريطاني راقي" },
+  { arName: "رودينا", id: "piTKgcLEGmPE4e6mEKli", desc: "صوت هادئ ومريح" },
+  { arName: "جودي", id: "21m00Tcm4TlvDq8ikWAM", desc: "صوت احترافي وواضح" },
+  { arName: "سلمى", id: "EXAVITQu4vr4xnSDxMaL", desc: "صوت ناعم ومعبر" },
 
-class ElevenLabs {
-  constructor() {
-    this.ins = axios.create({
-      baseURL: "https://tts1.squinty.art/api/v1",
-      headers: {
-        "content-type": "application/json; charset=UTF-8",
-        "user-agent": "NX/1.0.0",
-      },
-    });
+  // رجال
+  { arName: "ريان", id: "pNInz6obpgDQGcFmaJgB", desc: "صوت ذكوري متزن" },
+  { arName: "جاد", id: "ErXwobaYiN019PkySvjV", desc: "صوت ذكوري قوي" },
+  { arName: "باسل", id: "VR6AewLTigWG4xSOukaG", desc: "صوت عميق وقوي" },
+  { arName: "سامي", id: "pqHfZKP75CvOlQylNhV4", desc: "صوت وثائقي احترافي" },
+  { arName: "رامي", id: "nPczCjzI2devNBz1zQrb", desc: "صوت ذكوري واثق" },
+  { arName: "كريم", id: "N2lVS1w4EtoT3dr4eOWO", desc: "صوت دافئ" },
+  { arName: "نور", id: "IKne3meq5aSn9XLyUdCD", desc: "صوت ودي ولطيف" },
+  { arName: "آدمو", id: "2EiwWnXFnvU5JabPnv8n", desc: "صوت أمريكي متوسط" },
+  { arName: "فهد", id: "onwK4e9ZLuTAKqWW03F9", desc: "صوت ذكوري رسمي" },
+  { arName: "دان", id: "CYw3kZ02Hs0563khs1Fj", desc: "صوت بريطاني شاب" },
+  { arName: "ليو", id: "29vD33N1CtxCmqQRPOHJ", desc: "صوت أمريكي حيوي" },
+  { arName: "تيم", id: "g5CIjZEefAph4nQFvHAz", desc: "صوت جريء وواثق" },
+  { arName: "نزار", id: "D38z5RcWu1voky8WS1ja", desc: "صوت مرح ومتفائل" },
+  { arName: "عمر", id: "JBFqnCBsd6RMkjVDRZzb", desc: "صوت عميق ومؤثر" },
+  { arName: "كافا", id: "zcAOhNBS3c14rBihAFp1", desc: "صوت رجولي هادئ" },
+  { arName: "باهر", id: "z9fAnlkpzviPz146aGWa", desc: "صوت ساحر وجذاب" },
+  { arName: "هاني", id: "SOYHLrjzK2X1ezoPC6cr", desc: "صوت أمريكي قوي" },
+  { arName: "جادسون", id: "ZQe5CZNOzWyzPSCn5a3c", desc: "صوت أسترالي هادئ" },
+  { arName: "سيف", id: "Zlb1dXrM653N07WRdFW3", desc: "صوت بريطاني محترف" },
+  { arName: "راكان", id: "TxGEqnHWrfWFTfGW9XjX", desc: "صوت شاب وحيوي" },
+  { arName: "مهند", id: "flq6f7yk4E4fJM5XTYuZ", desc: "صوت أمريكي قوي" },
+  { arName: "كريمون", id: "ODq5zmih8GrVes37Dizd", desc: "صوت أمريكي جنوبي" },
+  { arName: "سندس", id: "yoZ06aMxZJJ28mfd3POQ", desc: "صوت شاب وديناميكي" },
+  { arName: "تيمور", id: "GBv7mTt0atIp3Br8iCZE", desc: "صوت أمريكي شاب" },
+];
+
+/* -------------------------------------------
+🎧 Class ElevenLabs
+------------------------------------------- */
+class ElevenLabsTTS {
+  constructor(apiKey) {
+    if (!apiKey) throw new Error("Missing ElevenLabs API Key");
+    this.apiKey = apiKey;
+    this.baseUrl = "https://api.elevenlabs.io/v1/text-to-speech/";
   }
 
-  genLogin() {
-    const randHex = (l) => crypto.randomUUID().replace(/-/g, "").slice(0, l),
-      randNum = (d) => String(Math.floor(Math.random() * 10 ** d)).padStart(d, "0"),
-      getRand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a,
-      b = getRand(0, 4);
+  async generate({ voiceId, text }) {
+    if (!voiceId || !text) throw new Error("Missing voiceId or text");
 
-    const [devices, country, lang, zone, ...nn] = [
-      [
-        "Samsung Galaxy S25 Ultra",
-        "Google Pixel 10",
-        "OnePlus 13",
-        "Xiaomi 15 Ultra",
-        "Oppo Find X8 Pro",
-      ],
-      ["ID", "VN", "PH", "MM", "JP"],
-      ["id", "vi", "en", "my", "jp"],
-      [
-        "Asia/Jakarta",
-        "Asia/Ho_Chi_Minh",
-        "Asia/Manila",
-        "Asia/Yangon",
-        "Asia/Tokyo",
-      ],
-      ["Hiro", "Yuki", "Sora", "Riku", "Kaito"],
-      ["Tanaka", "Sato", "Nakamura", "Kobayashi", "Yamamoto"],
-    ];
+    const response = await axios.post(
+      `${this.baseUrl}${voiceId}`,
+      {
+        text,
+        voice_settings: { stability: 0.7, similarity_boost: 0.9 },
+      },
+      {
+        headers: {
+          "xi-api-key": this.apiKey,
+          "Content-Type": "application/json",
+        },
+        responseType: "arraybuffer",
+      }
+    );
 
-    const [fn, ln] = nn.map((z) => z[Math.floor(Math.random() * z.length)]);
+    const base64 = Buffer.from(response.data).toString("base64");
 
     return {
-      build: "14",
-      country: country[b],
-      deviceId: randHex(16),
-      deviceModel: `${devices[getRand(0, devices.length - 1)]}`,
-      displayName: `${fn} ${ln}`,
-      email: `${fn.toLowerCase()}${randNum(4)}${randHex(4)}@gmail.com`,
-      googleAccountId: randNum(18),
-      language: lang[b],
-      osVersion: String(26 + Math.floor(Math.random() * 4)),
-      platform: "android",
-      timeZone: zone[b],
-      version: "1.1.4",
+      file: base64,
+      mimetype: "audio/mpeg",
     };
-  }
-
-  async login() {
-    const z = await this.ins.post("/login/login", this.genLogin());
-    this.ins.defaults.headers.common.authorization = "Bearer " + z.data.token;
-  }
-
-  async create(f = {}) {
-    const { data } = await this.ins.post("/generate/generate", {
-      text: f.text || "hello world",
-      voiceId: f.id || "2EiwWnXFnvU5JabPnv8n",
-      modelId: f.model || "eleven_turbo_v2_5",
-      styleExaggeration: f.exaggeration || "50",
-      claritySimilarityBoost: f.clarity || "50",
-      stability: f.stability || "50",
-    });
-    return data;
   }
 }
 
-// GET / POST
-router.get("/", async (req, res) => {
+/* -------------------------------------------
+🧩 POST - Body { voice, text }
+------------------------------------------- */
+router.post("/", async (req, res) => {
   try {
-    const { prompt, voice } = req.query;
-    if (!prompt || !voice)
-      return res
-        .status(400)
-        .json({ status: false, message: "❌ يرجى إدخال prompt و voice" });
+    const { voice, text } = req.body;
 
-    const voiceId = voices[voice];
-    if (!voiceId)
-      return res
-        .status(400)
-        .json({ status: false, message: "❌ الصوت غير موجود" });
+    if (!voice || !text)
+      return res.status(400).json({ status: false, message: "⚠️ ارسل voice و text" });
 
-    const eleven = new ElevenLabs();
-    await eleven.login();
-    const data = await eleven.create({ text: prompt, id: voiceId });
+    const voiceObj = voices.find(v => v.arName === voice);
+    if (!voiceObj)
+      return res.status(404).json({ status: false, message: "❌ الصوت غير موجود" });
 
-    if (!data?.url) throw new Error("لم يتم استلام رابط الصوت");
+    const tts = new ElevenLabsTTS(process.env.ELEVEN_API_KEY);
+    const result = await tts.generate({ voiceId: voiceObj.id, text });
 
-    res.json({ status: true, url: data.url });
+    res.json({
+      status: true,
+      voice: voice,
+      response: `data:audio/mpeg;base64,${result.file}`,
+    });
   } catch (err) {
-    res.status(500).json({ status: false, message: err.message });
+    console.error(err);
+    res.status(500).json({ status: false, error: err.message });
   }
 });
 
-// 🎧 POST
-router.post("/", async (req, res) => {
+/* -------------------------------------------
+🧩 GET - Query ?voice=ليانا&text=مرحبا
+------------------------------------------- */
+router.get("/", async (req, res) => {
   try {
-    const { prompt, voice } = req.body;
-    if (!prompt || !voice)
-      return res
-        .status(400)
-        .json({ status: false, message: "❌ يرجى إدخال prompt و voice" });
+    const { voice, text } = req.query;
 
-    const voiceId = voices[voice];
-    if (!voiceId)
-      return res
-        .status(400)
-        .json({ status: false, message: "❌ الصوت غير موجود" });
+    if (!voice || !text)
+      return res.status(400).json({ status: false, message: "⚠️ ارسل voice و text" });
 
-    const eleven = new ElevenLabs();
-    await eleven.login();
-    const data = await eleven.create({ text: prompt, id: voiceId });
+    const voiceObj = voices.find(v => v.arName === voice);
+    if (!voiceObj)
+      return res.status(404).json({ status: false, message: "❌ الصوت غير موجود" });
 
-    if (!data?.url) throw new Error("لم يتم استلام رابط الصوت");
+    const tts = new ElevenLabsTTS(process.env.ELEVEN_API_KEY);
+    const result = await tts.generate({ voiceId: voiceObj.id, text });
 
-    res.json({ status: true, url: data.url });
+    res.json({
+      status: true,
+      voice,
+      response: `data:audio/mpeg;base64,${result.file}`,
+    });
   } catch (err) {
-    res.status(500).json({ status: false, message: err.message });
+    console.error(err);
+    res.status(500).json({ status: false, error: err.message });
   }
+});
+
+/* -------------------------------------------
+📘 عرض قائمة الأصوات
+------------------------------------------- */
+router.get("/voices", (req, res) => {
+  res.json({
+    status: true,
+    voices: voices.map(v => ({
+      name: v.arName,
+      id: v.id,
+      desc: v.desc,
+    })),
+  });
 });
 
 export default router;
