@@ -1,128 +1,163 @@
 import express from "express";
 import axios from "axios";
-import { fileTypeFromBuffer } from "file-type";
 
 const router = express.Router();
 
-/* 🧩 نفس الدالة اللي عطيتها — بدون تغيير حرف */
-async function gptimage(prompt, buffer) {
-  try {
-    if (!prompt) throw new Error("Prompt is required.");
-    if (!Buffer.isBuffer(buffer)) throw new Error("Image must be a buffer.");
+class NanoBananaAPI {
+  constructor() {
+    this.uploadUrlEndpoint = "https://imgeditor.co/api/get-upload-url";
+    this.generateEndpoint = "https://imgeditor.co/api/generate-image";
+    this.statusEndpoint = "https://imgeditor.co/api/generate-image/status";
+    this.headers = {
+      accept: "*/*",
+      "content-type": "application/json",
+    };
+  }
 
-    const { data } = await axios.post(
-      "https://ghibli-proxy.netlify.app/.netlify/functions/ghibli-proxy",
+  async getImageBuffer(imageUrl) {
+    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: response.headers["content-type"] || "image/jpeg",
+    };
+  }
+
+  async generate({ prompt, imageUrl, styleId = "realistic", model = "nano-banana", maxPolls = 60, pollDelay = 2000 }) {
+    if (!prompt) throw new Error("الوصف (prompt) مطلوب");
+    if (!imageUrl) throw new Error("رابط الصورة (imageUrl) مطلوب");
+
+    // 1️⃣ تحميل الصورة
+    const { buffer: imageBuffer, contentType } = await this.getImageBuffer(imageUrl);
+    const ext = contentType.split("/")[1] || "jpg";
+    const fileName = `photo.${ext}`;
+
+    // 2️⃣ طلب رابط الرفع
+    const uploadInfoResp = await axios.post(
+      this.uploadUrlEndpoint,
       {
-        image: "data:image/png;base64," + buffer.toString("base64"),
-        prompt: prompt,
-        model: "gpt-image-1",
-        n: 1,
-        size: "auto",
-        quality: "low",
+        fileName,
+        contentType,
+        fileSize: imageBuffer.length,
       },
-      {
-        headers: {
-          origin: "https://overchat.ai",
-          referer: "https://overchat.ai/",
-          "user-agent": "Mozilla/5.0",
-        },
-      }
+      { headers: this.headers }
     );
 
-    const result = data?.data?.[0]?.b64_json;
-    if (!result) throw new Error("No result found.");
+    const uploadInfo = uploadInfoResp.data;
+    if (!uploadInfo?.uploadUrl || !uploadInfo?.publicUrl) {
+      throw new Error("معلومات الرفع غير كاملة من الخادم");
+    }
 
-    return Buffer.from(result, "base64");
-  } catch (error) {
-    throw new Error(error.message);
+    // 3️⃣ رفع الصورة
+    await axios.put(uploadInfo.uploadUrl, imageBuffer, {
+      headers: { "content-type": contentType },
+    });
+
+    // 4️⃣ طلب التوليد
+    const genResp = await axios.post(
+      this.generateEndpoint,
+      {
+        prompt,
+        styleId,
+        mode: "image",
+        imageUrl: uploadInfo.publicUrl,
+        imageUrls: [uploadInfo.publicUrl],
+        numImages: 1,
+        outputFormat: "png",
+        model,
+      },
+      { headers: this.headers }
+    );
+
+    const taskId = genResp.data?.taskId;
+    if (!taskId) throw new Error("الخادم لم يرجع taskId");
+
+    // 5️⃣ تتبع الحالة
+    let polls = 0;
+    while (polls < maxPolls) {
+      await new Promise((r) => setTimeout(r, pollDelay));
+      polls++;
+
+      try {
+        const statusResp = await axios.get(`${this.statusEndpoint}?taskId=${encodeURIComponent(taskId)}`, {
+          headers: { accept: "*/*" },
+        });
+
+        const status = statusResp.data;
+
+        if (status.status === "completed" && status.imageUrl) {
+          return status.imageUrl;
+        }
+
+        if (status.status === "failed" || status.status === "error") {
+          throw new Error(`المهمة فشلت: ${status.message || "خطأ أثناء التوليد"}`);
+        }
+      } catch (err) {
+        // استمر في المحاولة
+        if (polls >= maxPolls) throw err;
+      }
+    }
+
+    throw new Error("انتهت المهلة: لم تكتمل المهمة في الوقت المتوقع");
   }
 }
 
-/* ------------------- 🧩 Helper لتحميل الصور ------------------- */
-async function fetchBuffer(url) {
-  const r = await axios.get(url, { responseType: "arraybuffer" });
-  return Buffer.from(r.data);
-}
-
-/* ------------------- 🧠 ROUTES ------------------- */
-
-/**
- * 🧩 POST /gptimg
- * body: { prompt: "اجعلها انمي", imageUrl: "https://xxx.jpg" }
- */
+/** 🧩 POST Route */
 router.post("/", async (req, res) => {
   try {
-    const { prompt, imageUrl } = req.body;
+    const { prompt, imageUrl, styleId, model } = req.body;
 
-    if (!prompt)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ النص مطلوب (prompt)",
-      });
+    if (!prompt) {
+      return res.status(400).json({ status: false, message: "⚠️ الوصف مطلوب (prompt)" });
+    }
 
-    if (!imageUrl)
-      return res.status(400).json({
-        status: false,
-        message: "⚠️ رابط الصورة مطلوب (imageUrl)",
-      });
+    if (!imageUrl) {
+      return res.status(400).json({ status: false, message: "⚠️ رابط الصورة مطلوب (imageUrl)" });
+    }
 
-    const buffer = await fetchBuffer(imageUrl);
-
-    const resultBuffer = await gptimage(prompt, buffer);
-
-    const base64 = resultBuffer.toString("base64");
+    const nanoBanana = new NanoBananaAPI();
+    const resultUrl = await nanoBanana.generate({ prompt, imageUrl, styleId, model });
 
     res.json({
       status: true,
-      message: "✅ تم تعديل الصورة بنجاح",
-      result: `data:image/jpeg;base64,${base64}`,
+      message: "✅ تم التوليد بنجاح",
+      imageUrl: resultUrl,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ خطأ أثناء معالجة الصورة",
+      message: "❌ حدث خطأ أثناء توليد الصورة",
       error: err.message,
     });
   }
 });
 
-/**
- * 🧩 GET /gptimg?prompt=اجعلها انمي&imageUrl=https://xx.jpg,https://yy.jpg
- */
+/** 🧩 GET Route */
 router.get("/", async (req, res) => {
   try {
-    const prompt = req.query.prompt;
-    let imageUrl = req.query.imageUrl;
+    const { prompt, imageUrl, styleId, model } = req.query;
 
-    if (!prompt)
-      return res.status(400).json({ status: false, message: "⚠️ النص مطلوب (prompt)" });
-
-    if (!imageUrl)
-      return res
-        .status(400)
-        .json({ status: false, message: "⚠️ رابط الصورة مطلوب (imageUrl)" });
-
-    if (typeof imageUrl === "string") imageUrl = imageUrl.split(",");
-
-    const results = [];
-
-    for (const url of imageUrl) {
-      const buffer = await fetchBuffer(url);
-      const edited = await gptimage(prompt, buffer);
-      results.push("data:image/jpeg;base64," + edited.toString("base64"));
+    if (!prompt) {
+      return res.status(400).json({ status: false, message: "⚠️ الوصف مطلوب (prompt)" });
     }
+
+    if (!imageUrl) {
+      return res.status(400).json({ status: false, message: "⚠️ رابط الصورة مطلوب (imageUrl)" });
+    }
+
+    const nanoBanana = new NanoBananaAPI();
+    const resultUrl = await nanoBanana.generate({ prompt, imageUrl, styleId, model });
 
     res.json({
       status: true,
-      message: "✅ تم تعديل الصور بنجاح",
-      results,
+      message: "✅ تم التوليد بنجاح",
+      imageUrl: resultUrl,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       status: false,
-      message: "❌ خطأ أثناء معالجة الصورة",
+      message: "❌ حدث خطأ أثناء توليد الصورة",
       error: err.message,
     });
   }
